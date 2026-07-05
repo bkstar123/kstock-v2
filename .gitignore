@@ -1,0 +1,16 @@
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+# Local macOS dev-environment scripts + doc (Apache/mod_php up/down). Not for production.
+/deployment-local
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/.project
+.php_cs.cache

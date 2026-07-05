@@ -1,0 +1,38 @@
+{
+    "name": "bkstar123/log-enhancer",
+    "description": "This package enhances Laravel logging feature",
+    "keywords": [
+        "log",
+        "laravel",
+        "logging",
+        "enhancer",
+        "enhancing",
+        "log-enhancer"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\LogEnhancer\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\LogEnhancer\\DebugLogServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.21"
+}

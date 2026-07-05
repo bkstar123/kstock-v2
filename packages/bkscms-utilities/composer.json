@@ -1,0 +1,36 @@
+{
+    "name": "bkstar123/bkscms-utilities",
+    "description": "Provides neccessary utilities for the bkscms project",
+    "keywords": [
+        "laravel",
+        "bkscms",
+        "utilities",
+        "bkscms-utilities"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\BksCMS\\Utilities\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\BksCMS\\Utilities\\Providers\\UtilitiesServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.6"
+}

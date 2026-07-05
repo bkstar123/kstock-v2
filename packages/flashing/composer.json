@@ -1,0 +1,41 @@
+{
+    "name": "bkstar123/flashing",
+    "description": "A lightweight package to send flash messages in Laravel applications. This packages only supports one single flash message at a time, and the flash message is displayed in the format of a toast notification",
+    "keywords": [
+        "laravel",
+        "php",
+        "flash",
+        "message",
+        "toast",
+        "notification"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\Flashing\\": "src/"
+        },
+        "files": [
+            "src/Helpers/helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\Flashing\\FlashingServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.2"
+}

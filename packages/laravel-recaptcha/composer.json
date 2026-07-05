@@ -1,0 +1,39 @@
+{
+    "name": "bkstar123/laravel-recaptcha",
+    "description": "Google reCaptcha v2 checkbox & v3 validation",
+    "keywords": [
+        "laravel",
+        "reCaptcha_V2",
+        "reCaptcha_V3",
+        "validator",
+        "validation",
+        "laravel-recaptcha"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2",
+        "guzzlehttp/guzzle": "^7.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\LaravelRecaptcha\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\LaravelRecaptcha\\LaravelRecaptchaServiceProvider"
+            ]
+        }
+    },
+    "version": "1.1.4"
+}

@@ -1,0 +1,1 @@
+Highcharts.theme={"chart":{"backgroundColor":"transparent"},"plotOptions":{"line":{"marker":{"enabled":false}}},"legend":{"enabled":true,"align":"right","verticalAlign":"bottom"},"credits":{"enabled":false},"xAxis":{"visible":false},"yAxis":{"visible":false}};Highcharts.setOptions(Highcharts.theme);

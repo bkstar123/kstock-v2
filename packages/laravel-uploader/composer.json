@@ -1,0 +1,34 @@
+{
+    "name": "bkstar123/laravel-uploader",
+    "description": "A Laravel package for handling file upload",
+    "keywords": [
+        "laravel",
+        "file-upload"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\LaravelUploader\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\LaravelUploader\\LaravelUploaderServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.14"
+}

@@ -1,0 +1,42 @@
+{
+    "name": "bkstar123/bkscms-admin-panel",
+    "description": "A bkstar123/bkscms's package for authentication and authorization of admin users",
+    "keywords": [
+        "laravel",
+        "admin",
+        "admin-auth",
+        "admin-authentication",
+        "admin-authorization",
+        "authentication",
+        "authorization"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Hoang Anh Tuan",
+            "email": "hoangtuandhbk@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bkstar123\\BksCMS\\AdminPanel\\": "src/"
+        },
+        "classmap": [
+            "src/database/seeds"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Bkstar123\\BksCMS\\AdminPanel\\Providers\\AdminPanelServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.11"
+}
