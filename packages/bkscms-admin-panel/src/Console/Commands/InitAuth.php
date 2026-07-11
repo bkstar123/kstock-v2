@@ -59,14 +59,18 @@ class InitAuth extends Command
             case 'permissions':
                 $this->info('Populating permissions data...');
                 $this->call('db:seed', [
-                    '--class' => \PermissionsTableSeeder::class
+                    // Prefix a leading backslash so Laravel's SeedCommand treats this as a
+                    // fully-qualified name and does NOT prepend the "Database\Seeders\"
+                    // namespace — these seeders live in the global namespace (classmapped
+                    // from packages/.../database/seeds), unlike app default seeders.
+                    '--class' => '\\' . \PermissionsTableSeeder::class
                 ]);
                 $this->info('Permissions have been populated.');
                 break;
             case 'all':
                 $this->info('Rebuilding auth data...');
                 $this->call('db:seed', [
-                    '--class' => \AdminPanelSeeder::class
+                    '--class' => '\\' . \AdminPanelSeeder::class
                 ]);
                 $this->info('Auth data have been populated');
                 break;
