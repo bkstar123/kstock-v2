@@ -19,17 +19,17 @@ class PermissionsTableSeeder extends Seeder
      */
     public function run()
     {
-        DB::transaction(function () {
-            Schema::disableForeignKeyConstraints();
-            DB::table('permissions')->truncate();
-            DB::table('permission_role')->truncate();
-            Schema::enableForeignKeyConstraints();
-            $permissions = config('bkstar123_bkscms_adminpanel.permissions');
-            foreach ($permissions as $permission) {
-                $permission['created_at'] = Carbon::now();
-                $permission['updated_at'] = Carbon::now();
-                DB::table('permissions')->insert($permission);
-            }
-        });
+        // No DB::transaction() wrapper: TRUNCATE (DDL) implicitly commits on MySQL and
+        // breaks the surrounding transaction. Run reset + inserts directly.
+        Schema::disableForeignKeyConstraints();
+        DB::table('permissions')->truncate();
+        DB::table('permission_role')->truncate();
+        Schema::enableForeignKeyConstraints();
+        $permissions = config('bkstar123_bkscms_adminpanel.permissions');
+        foreach ($permissions as $permission) {
+            $permission['created_at'] = Carbon::now();
+            $permission['updated_at'] = Carbon::now();
+            DB::table('permissions')->insert($permission);
+        }
     }
 }

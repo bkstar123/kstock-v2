@@ -18,18 +18,18 @@ class AdminRoleTableSeeder extends Seeder
      */
     public function run()
     {
-        DB::transaction(function () {
-            Schema::disableForeignKeyConstraints();
-            DB::table('admin_role')->truncate();
-            Schema::enableForeignKeyConstraints();
-            DB::table('admin_role')->insert([
-                'admin_id' => 1,
-                'role_id' => 1,
-            ]);
-            DB::table('admin_role')->insert([
-                'admin_id' => 2,
-                'role_id' => 2,
-            ]);
-        });
+        // No DB::transaction() wrapper: TRUNCATE (DDL) implicitly commits on MySQL and
+        // breaks the surrounding transaction. Run reset + inserts directly.
+        Schema::disableForeignKeyConstraints();
+        DB::table('admin_role')->truncate();
+        Schema::enableForeignKeyConstraints();
+        DB::table('admin_role')->insert([
+            'admin_id' => 1,
+            'role_id' => 1,
+        ]);
+        DB::table('admin_role')->insert([
+            'admin_id' => 2,
+            'role_id' => 2,
+        ]);
     }
 }

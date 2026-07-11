@@ -19,23 +19,23 @@ class RolesTableSeeder extends Seeder
      */
     public function run()
     {
-        DB::transaction(function () {
-            Schema::disableForeignKeyConstraints();
-            DB::table('roles')->truncate();
-            Schema::enableForeignKeyConstraints();
-            DB::table('roles')->insert([
-                'role' => 'superadmins',
-                'description' => 'This role has a super privilege to do everything. You should only grant it to the site developer team',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ]);
+        // No DB::transaction() wrapper: TRUNCATE (DDL) implicitly commits on MySQL and
+        // breaks the surrounding transaction. Run reset + inserts directly.
+        Schema::disableForeignKeyConstraints();
+        DB::table('roles')->truncate();
+        Schema::enableForeignKeyConstraints();
+        DB::table('roles')->insert([
+            'role' => 'superadmins',
+            'description' => 'This role has a super privilege to do everything. You should only grant it to the site developer team',
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
+        ]);
 
-            DB::table('roles')->insert([
-                'role' => 'administrators',
-                'description' => 'This role should only be granted to the site administrators',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ]);
-        });
+        DB::table('roles')->insert([
+            'role' => 'administrators',
+            'description' => 'This role should only be granted to the site administrators',
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
+        ]);
     }
 }
