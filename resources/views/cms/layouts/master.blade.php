@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="{{ asset('cms-assets/css/modern.css') }}?v=19" rel="stylesheet">
+    <link href="{{ asset('cms-assets/css/modern.css') }}?v=20" rel="stylesheet">
     @stack('css')
     <script src="{{ mix('/cms-assets/js/app.js') }}"></script>
     <script src="{{ mix('/cms-assets/js/plugins.js') }}"></script>
