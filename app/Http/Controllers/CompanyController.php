@@ -98,9 +98,40 @@ class CompanyController extends Controller
             ->where('symbol_code', $symbol->code)
             ->exists();
 
+        $priceToBook = $this->priceToBook($fundamentals, $statements->first());
+
         return view('cms.companies.show', compact(
-            'symbol', 'profile', 'fundamentals', 'latestQuote', 'statements', 'inWatchlist'
+            'symbol', 'profile', 'fundamentals', 'latestQuote', 'statements', 'inWatchlist',
+            'priceToBook'
         ));
+    }
+
+    /**
+     * Trailing Price-to-Book: current market cap / latest reported total equity
+     * (balance-sheet item 302, VCSH). The external fundamental endpoint doesn't
+     * expose P/B, so it is derived here; market cap and statement values share the
+     * same full-VND scale. Returns null when market cap or a balance statement is
+     * unavailable, or equity is non-positive (P/B not meaningful).
+     *
+     * @param  array|null  $fundamentals
+     * @param  \App\Models\FinancialStatement|null  $latest
+     * @return float|null
+     */
+    private function priceToBook($fundamentals, $latest)
+    {
+        $marketCap = $fundamentals['marketCap'] ?? null;
+        if (!is_numeric($marketCap) || !$latest || !$latest->balance_statement) {
+            return null;
+        }
+        $equityItem = $latest->balance_statement->getItem('302');
+        if (!$equityItem) {
+            return null;
+        }
+        $equity = $equityItem->getValue($latest->year, $latest->quarter);
+        if ($equity <= 0) {
+            return null;
+        }
+        return round($marketCap / $equity, 2);
     }
 
     /**

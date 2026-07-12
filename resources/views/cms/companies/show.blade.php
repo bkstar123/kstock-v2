@@ -44,7 +44,7 @@
 {{-- Fundamentals --}}
 @php $f = $fundamentals ?? []; @endphp
 <div class="row">
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-lg mb-3">
         <div class="small-box bg-primary">
             <div class="inner">
                 <h3 style="font-size:1.6rem">{{ isset($f['marketCap']) ? number_format($f['marketCap']/1e9) : '—' }}</h3>
@@ -53,7 +53,7 @@
             <div class="icon"><i class="fas fa-coins"></i></div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-lg mb-3">
         <div class="small-box bg-info">
             <div class="inner">
                 <h3 style="font-size:1.6rem">{{ isset($f['pe']) ? number_format($f['pe'], 2) : '—' }}</h3>
@@ -62,7 +62,16 @@
             <div class="icon"><i class="fas fa-balance-scale"></i></div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-lg mb-3">
+        <div class="small-box bg-secondary">
+            <div class="inner">
+                <h3 style="font-size:1.6rem">{{ $priceToBook !== null ? number_format($priceToBook, 2) : '—' }}</h3>
+                <p>P/B</p>
+            </div>
+            <div class="icon"><i class="fas fa-book"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-lg mb-3">
         <div class="small-box bg-success">
             <div class="inner">
                 <h3 style="font-size:1.6rem">{{ isset($f['eps']) ? number_format($f['eps']) : '—' }}</h3>
@@ -71,7 +80,7 @@
             <div class="icon"><i class="fas fa-chart-line"></i></div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-6 col-lg mb-3">
         <div class="small-box bg-warning">
             <div class="inner">
                 <h3 style="font-size:1.6rem">

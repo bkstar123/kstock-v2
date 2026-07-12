@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\FinancialStatement;
 use App\Models\Symbol;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
@@ -84,6 +85,34 @@ class CompanyDirectoryTest extends TestCase
 
         // remember() should have upserted the master row
         $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_show_displays_pb_card_even_without_statements()
+    {
+        // P/B card label always renders; value is "—" when no book value is available.
+        $this->actingAs($this->admin(), 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)->assertSee('P/B');
+    }
+
+    public function test_pb_is_derived_from_market_cap_and_latest_equity()
+    {
+        $admin = $this->admin();
+
+        // Latest balance statement exposing total equity (item 302 = VCSH).
+        $fs = FinancialStatement::create([
+            'symbol' => 'FPT', 'admin_id' => $admin->id, 'year' => 2024, 'quarter' => 0,
+        ]);
+        $fs->balance_statement()->create([
+            'content' => json_encode([[
+                'id' => '302', 'name' => 'VCSH', 'parentID' => 0, 'expanded' => true,
+                'level' => 1, 'field' => 'BS',
+                'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 34000000000000]],
+            ]]),
+        ]);
+
+        // FakeSymbols market cap for FPT = 124,185,669,120,000 → P/B ≈ 3.65.
+        $this->actingAs($admin, 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)->assertSee('3.65');
     }
 
     public function test_show_unknown_company_redirects_to_directory()
