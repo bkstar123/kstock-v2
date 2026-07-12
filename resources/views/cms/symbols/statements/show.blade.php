@@ -114,8 +114,8 @@
         <div class="card ks-score-tile ks-zone-{{ $t['tone'] ?: 'secondary' }}">
             <div class="card-body py-3">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div class="text-muted text-truncate" title="{{ $t['label'] }}" style="font-size:.8rem">
-                        {{ $t['label'] }}@if(!empty($t['ttm']))<sup class="ks-ttm-badge" title="Đã quy đổi năm: lũy kế 4 quý gần nhất (TTM)">TTM</sup>@endif
+                    <div class="text-muted d-flex align-items-start" style="font-size:.8rem; min-width:0">
+                        <span class="text-truncate" title="{{ $t['label'] }}">{{ $t['label'] }}</span>@if(!empty($t['ttm']))<sup class="ks-ttm-badge" title="Đã quy đổi năm: lũy kế 4 quý gần nhất (TTM)">TTM</sup>@endif
                     </div>
                     <span class="ks-spark ks-tile-spark" data-values="{{ implode(',', array_reverse($t['values'])) }}"></span>
                 </div>
