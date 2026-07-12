@@ -172,7 +172,7 @@
 @push('scriptBottom')
 <script src="{{ url('/js/vendor/highcharts/highcharts.js') }}"></script>
 <script>
-    window.ksPriceHistoryUrl = "{{ route('cms.companies.priceHistory', ['code' => $symbol->code]) }}";
+    window.ksPriceHistoryUrl = "{{ route('cms.companies.priceHistory', ['code' => $symbol->code], false) }}";
     window.ksSymbolCode = "{{ $symbol->code }}";
 </script>
 <script src="{{ asset('cms-assets/js/companies/price-chart.js') }}?v=1"></script>
