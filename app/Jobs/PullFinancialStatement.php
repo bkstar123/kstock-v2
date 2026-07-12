@@ -8,6 +8,7 @@
 namespace App\Jobs;
 
 use Exception;
+use Throwable;
 use App\Events\JobFailing;
 use Illuminate\Bus\Queueable;
 use App\Models\IncomeStatement;
@@ -108,10 +109,14 @@ class PullFinancialStatement implements ShouldQueue
     /**
      * The job failed to process.
      *
-     * @param  Exception  $exception
+     * Must accept Throwable (not Exception): the job can fail with an Error, and a
+     * narrower Exception hint would itself raise a TypeError here, masking the
+     * real failure.
+     *
+     * @param  Throwable  $exception
      * @return void
      */
-    public function failed(Exception $exception)
+    public function failed(Throwable $exception)
     {
         JobFailing::dispatch($this->user, $exception->getMessage());
     }
