@@ -36,6 +36,10 @@ Route::group(
             ->name('cms.settings.update')
             ->middleware('bkscms-auth:admins')
             ->middleware('can:settings.update');
+        Route::post('settings/market-calendar', 'SettingController@updateMarketCalendar')
+            ->name('cms.settings.marketCalendar.update')
+            ->middleware('bkscms-auth:admins')
+            ->middleware('can:settings.update');
     }
 );
 

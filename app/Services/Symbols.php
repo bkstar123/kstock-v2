@@ -71,7 +71,7 @@ class Symbols extends Base implements SymbolsInterface
     public function getFundamentalsData(string $symbol)
     {
         $enc = rawurlencode($symbol);
-        return $this->cachedGet("fa:fundamental:$enc", "/symbols/$enc/fundamental", marketDataTtl(300, (array) config('market.holidays', [])));
+        return $this->cachedGet("fa:fundamental:$enc", "/symbols/$enc/fundamental", marketDataTtl(300, marketHolidays()));
     }
 
     /**
@@ -85,7 +85,7 @@ class Symbols extends Base implements SymbolsInterface
         $enc = rawurlencode($symbol);
         $path = "/symbols/$enc/historical-quotes?startDate=" . rawurlencode($startDate)
               . "&endDate=" . rawurlencode($endDate) . "&offset=0&limit=$limit";
-        return $this->cachedGet("fa:quotes:$enc:$startDate:$endDate:$limit", $path, marketDataTtl(300, (array) config('market.holidays', [])));
+        return $this->cachedGet("fa:quotes:$enc:$startDate:$endDate:$limit", $path, marketDataTtl(300, marketHolidays()));
     }
 
     /**

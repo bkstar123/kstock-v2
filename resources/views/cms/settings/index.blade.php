@@ -16,6 +16,11 @@
                 		Display Codes of Statement Items
                 	</a>
                 </li>
+                <li class="nav-item">
+                	<a class="nav-link" href="#refreshCalendar" data-toggle="tab">
+                		Refresh Calendar
+                	</a>
+                </li>
             </ul>
         </div>
 	</div>
@@ -113,7 +118,80 @@
 					</div>
 				</div>
             </div>
+            <div class="tab-pane" id="refreshCalendar">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Refresh Calendar</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Chọn những ngày thị trường chứng khoán Việt Nam đóng cửa (ngày lễ) để
+                            <strong>loại khỏi lịch refresh dữ liệu</strong>. Cuối tuần đã được tự động
+                            loại trừ (hiển thị mờ), bạn chỉ cần thêm các ngày lễ.
+                        </p>
+                        <form action="{{ route('cms.settings.marketCalendar.update') }}" method="POST"
+                              id="ks-calendar-form">
+                            @csrf
+                            <div id="ks-calendar" class="ks-cal"></div>
+
+                            <div class="ks-cal-selected mt-3">
+                                <label class="d-block mb-1">
+                                    Ngày đã loại trừ (<span id="ks-cal-count">0</span>)
+                                </label>
+                                <div id="ks-cal-chips" class="ks-cal-chips"></div>
+                            </div>
+
+                            <input type="hidden" name="holidays" id="ks-cal-input" value="[]">
+                            <div class="col-12 text-right mt-3 px-0">
+                                <button class="btn btn-success" type="submit">
+                                    <i class="fa fa-fw fa-lg fa-check-circle"></i>Exclude from refresh
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
 	</div>
 </div>
 @endsection
+
+@push('css')
+<style>
+    .ks-cal { max-width: 520px; }
+    .ks-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; }
+    .ks-cal-title { font-weight:700; font-size:1.05rem; color:var(--ks-ink,#0f172a); }
+    .ks-cal-nav { display:flex; gap:.35rem; }
+    .ks-cal-nav button { border:1px solid var(--ks-border,#e6eaf1); background:var(--ks-card,#fff);
+        border-radius:var(--ks-radius-sm,10px); width:34px; height:34px; line-height:1; cursor:pointer;
+        color:var(--ks-ink,#0f172a); transition:.15s; }
+    .ks-cal-nav button:hover { border-color:var(--ks-primary,#6366f1); color:var(--ks-primary,#6366f1); }
+    .ks-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+    .ks-cal-dow { text-align:center; font-size:.72rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:.03em; color:var(--ks-muted,#64748b); padding:.25rem 0; }
+    .ks-cal-cell { aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+        border:1px solid var(--ks-border,#e6eaf1); border-radius:var(--ks-radius-sm,10px);
+        font-size:.85rem; font-weight:600; cursor:pointer; user-select:none; background:var(--ks-card,#fff);
+        color:var(--ks-ink,#0f172a); transition:.12s; }
+    .ks-cal-cell:hover { border-color:var(--ks-primary,#6366f1); }
+    .ks-cal-cell.is-empty { border:none; background:transparent; cursor:default; }
+    .ks-cal-cell.is-weekend { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
+    .ks-cal-cell.is-today { box-shadow:0 0 0 2px var(--ks-primary,#6366f1) inset; }
+    .ks-cal-cell.is-holiday { background:var(--ks-primary,#6366f1); border-color:var(--ks-primary,#6366f1);
+        color:#fff; }
+    .ks-cal-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .ks-cal-chip { display:inline-flex; align-items:center; gap:.4rem; background:#eef2ff;
+        color:#4f46e5; border:1px solid #e0e7ff; border-radius:999px; padding:.2rem .6rem;
+        font-size:.78rem; font-weight:600; }
+    .ks-cal-chip button { border:none; background:transparent; color:#4f46e5; cursor:pointer;
+        font-size:1rem; line-height:1; padding:0; }
+    .ks-cal-empty { color:var(--ks-muted,#64748b); font-size:.82rem; }
+</style>
+@endpush
+
+@push('scriptBottom')
+<script>
+    window.ksMarketHolidays = @json(marketHolidays());
+</script>
+<script src="{{ asset('cms-assets/js/settings/refresh-calendar.js') }}?v=1"></script>
+@endpush

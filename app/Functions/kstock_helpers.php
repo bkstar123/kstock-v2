@@ -981,6 +981,31 @@ if (! function_exists('marketDataTtl')) {
     }
 }
 
+if (! function_exists('marketHolidays')) {
+    /**
+     * Exchange-closed holiday dates ('Y-m-d', Asia/Ho_Chi_Minh) that must be
+     * excluded from data refresh, on top of weekends + trading hours. Managed
+     * from Settings → Refresh calendar and stored as a JSON array under the
+     * `market_holidays` setting key (see SettingController::updateMarketCalendar).
+     *
+     * @return array<int, string>
+     */
+    function marketHolidays()
+    {
+        $raw = config('settings.market_holidays');
+        if (is_array($raw)) {
+            return array_values(array_filter($raw, 'is_string'));
+        }
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return array_values(array_filter($decoded, 'is_string'));
+            }
+        }
+        return [];
+    }
+}
+
 if (! function_exists('comparisonMetricCatalog')) {
     /**
      * Danh mục chỉ số dùng để so sánh nhiều mã cổ phiếu (bảng hợp nhất, ánh xạ khái niệm

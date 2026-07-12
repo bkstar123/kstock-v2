@@ -24,9 +24,20 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // Refresh the local symbols master table daily (needs cron / a scheduler
-        // runner; on local dev just run `php artisan symbols:sync` manually).
-        $schedule->command('symbols:sync')->dailyAt('01:30');
+        // Refresh the local symbols master table on trading days only (needs cron /
+        // a scheduler runner; on local dev just run `php artisan symbols:sync`).
+        // Skips weekends and the exchange holidays managed in Settings → Refresh
+        // calendar (config('settings.market_holidays') via marketHolidays()).
+        $schedule->command('symbols:sync')
+            ->weekdays()
+            ->dailyAt('01:30')
+            ->skip(function () {
+                return in_array(
+                    \Carbon\Carbon::now('Asia/Ho_Chi_Minh')->toDateString(),
+                    marketHolidays(),
+                    true
+                );
+            });
     }
 
     /**
