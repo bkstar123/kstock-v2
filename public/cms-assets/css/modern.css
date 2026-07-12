@@ -418,8 +418,12 @@ input[type="file"]::-webkit-file-upload-button:hover { filter: brightness(1.07);
     color: var(--ks-primary-600, #4f46e5);
     background: rgba(99, 102, 241, .14);
     border-radius: .2rem;
-    vertical-align: super;
-    line-height: 1.4;
+    /* Keep the badge inside the label's line box: it sits in a text-truncate
+       (overflow:hidden) container, so a raised superscript would be clipped.
+       Top-aligned within the line box gives the superscript look without
+       overflowing above it. */
+    vertical-align: top;
+    line-height: 1.1;
     cursor: help;
 }
 /* Icon cảnh báo đỏ cạnh giá trị kỳ mới nhất khi chỉ số đã mất ý nghĩa (vd CFO âm làm
