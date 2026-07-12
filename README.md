@@ -73,12 +73,29 @@ php artisan queue:work
 > through `SUPERADMIN_*` / `ADMIN_*` environment variables — **change them and
 > remove the default users before any non‑local deployment.**
 
+### Production deployment
+
+Production servers **must** install dependencies with `--no-dev` to exclude phpunit and other development packages:
+
+```bash
+composer install --no-dev --optimize-autoloader
+```
+
+If a production box was previously provisioned with a bare `composer install` (which installed dev dependencies), clean it up:
+
+```bash
+rm -rf vendor
+composer install --no-dev --optimize-autoloader
+```
+
+This ensures phpunit, faker, mockery, pail, and collision are never present on production. The test suite remains available locally and in CI — only production excludes it.
+
 ### Useful commands
 
 ```bash
 php artisan symbols:sync FPT VNM     # refresh the local symbols master table
 php artisan analysis:recompute        # re-run analysis for saved statements
-vendor/bin/phpunit                    # run the test suite
+vendor/bin/phpunit                    # run the test suite (local/CI only, never production)
 ```
 
 ---

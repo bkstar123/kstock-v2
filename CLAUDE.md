@@ -11,7 +11,9 @@ The CMS/admin-panel layer (auth, roles/permissions, settings, flashing messages)
 ## Common commands
 
 ```bash
-composer install                 # install PHP deps (packages/* are autoloaded as first-party source, not composer-installed — see below)
+composer install                 # install PHP deps for LOCAL/CI (includes phpunit, faker, mockery for testing)
+composer install --no-dev --optimize-autoloader  # PRODUCTION ONLY — excludes dev dependencies (phpunit, faker, mockery, pail, collision)
+
 npm install && npm run dev       # build frontend assets (Laravel Mix 4); may not build on newer Node — assets are already compiled under public/cms-assets/, so this is usually unnecessary (see deployment-local/README-LOCAL.md)
 php artisan migrate              # run DB migrations
 php artisan serve                # run the app locally (local dev instead uses Apache + mod_php + SQLite via deployment-local/kstock-v2-up.sh — see deployment-local/README-LOCAL.md)
@@ -20,7 +22,7 @@ php artisan queue:work           # process queued jobs (statement pulling/analys
 php artisan symbols:sync FPT VNM  # upsert the local `symbols` master table for the given tickers (scheduled daily 01:30 in Console/Kernel)
 php artisan analysis:recompute    # re-run analysis (overwrite AnalysisReport) for all saved statements with current formulas; {ids?*} to scope, {--type=direct|indirect}
 
-vendor/bin/phpunit                                  # run full test suite
+vendor/bin/phpunit                                  # run full test suite (local/CI only; never on production — see Common commands above)
 vendor/bin/phpunit --testsuite Unit                 # unit tests only (tests/Unit)
 vendor/bin/phpunit --testsuite Feature              # feature tests only (tests/Feature)
 vendor/bin/phpunit --filter TestMethodOrClassName    # run a single test
