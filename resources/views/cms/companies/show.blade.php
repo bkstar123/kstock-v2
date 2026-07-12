@@ -121,7 +121,7 @@
                 </div>
                 @if(!empty($p['overview']))
                     <h5 class="mt-3">Overview</h5>
-                    <p style="text-align:justify">{{ $p['overview'] }}</p>
+                    <p style="text-align:justify">{{ trim(html_entity_decode(strip_tags($p['overview']))) }}</p>
                 @endif
             </div>
 
