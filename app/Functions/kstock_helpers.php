@@ -927,7 +927,7 @@ if (! function_exists('businessSectorLabel')) {
             'manufacturing'     => 'Doanh nghiệp sản xuất',
             'non_manufacturing' => 'Doanh nghiệp phi sản xuất',
             'financial'         => 'Định chế tài chính',
-        ][$class] ?? null;
+        ][(string) $class] ?? null;
     }
 }
 
