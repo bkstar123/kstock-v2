@@ -30,7 +30,8 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->calculateDupontComponents($year, $quarter)->roaa
+                'value' => $calculator->calculateDupontComponents($year, $quarter)->roaa,
+                'ttm' => $quarter != 0
             ]);
             array_push($values2, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
@@ -42,7 +43,8 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => round($calculator->averageFinancialLeverage * $calculator->roaa, 1)
+                'value' => round($calculator->averageFinancialLeverage * $calculator->roaa, 1),
+                'ttm' => $quarter != 0
             ]);
             if ($i === 1 && $calculator->averageFinancialLeverage !== null && $calculator->averageFinancialLeverage < 0) {
                 $alert = 'Hệ số đòn bẩy tài chính trung bình (Tổng tài sản bq / VCSH bq) đang <strong>âm</strong> '
@@ -102,13 +104,15 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->calculateDupontComponents($year, $quarter)->ros2
+                'value' => $calculator->calculateDupontComponents($year, $quarter)->ros2,
+                'ttm' => $quarter != 0
             ]);
             array_push($values2, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->averageTotalAssetTurnOver
+                'value' => $calculator->averageTotalAssetTurnOver,
+                'ttm' => $quarter != 0
             ]);
             array_push($values3, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
@@ -120,7 +124,8 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => round($calculator->ros2 * $calculator->averageTotalAssetTurnOver * $calculator->averageFinancialLeverage, 1)
+                'value' => round($calculator->ros2 * $calculator->averageTotalAssetTurnOver * $calculator->averageFinancialLeverage, 1),
+                'ttm' => $quarter != 0
             ]);
             if ($i === 1 && $calculator->averageFinancialLeverage !== null && $calculator->averageFinancialLeverage < 0) {
                 $alert = 'Hệ số đòn bẩy tài chính trung bình (Tổng tài sản bq / VCSH bq) đang <strong>âm</strong> '
@@ -191,31 +196,36 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->calculateDupontComponents($year, $quarter)->earningAfterTaxParentCompanyToEarningBeforeTax
+                'value' => $calculator->calculateDupontComponents($year, $quarter)->earningAfterTaxParentCompanyToEarningBeforeTax,
+                'ttm' => $quarter != 0
             ]);
             array_push($values2, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->earningAfterTaxToEarningBeforeTax
+                'value' => $calculator->earningAfterTaxToEarningBeforeTax,
+                'ttm' => $quarter != 0
             ]);
             array_push($values3, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->earningBeforeTaxToEBIT
+                'value' => $calculator->earningBeforeTaxToEBIT,
+                'ttm' => $quarter != 0
             ]);
             array_push($values4, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->ebitMargin
+                'value' => $calculator->ebitMargin,
+                'ttm' => $quarter != 0
             ]);
             array_push($values5, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => $calculator->averageTotalAssetTurnOver
+                'value' => $calculator->averageTotalAssetTurnOver,
+                'ttm' => $quarter != 0
             ]);
             array_push($values6, [
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
@@ -227,7 +237,8 @@ trait DupontWriter
                 'period' => $quarter != 0 ? "Q$quarter $year" : "$year",
                 'year' => $year,
                 'quarter' => $quarter,
-                'value' => round($calculator->earningAfterTaxParentCompanyToEarningBeforeTax * $calculator->earningBeforeTaxToEBIT * $calculator->ebitMargin * $calculator->averageTotalAssetTurnOver * $calculator->averageFinancialLeverage, 1)
+                'value' => round($calculator->earningAfterTaxParentCompanyToEarningBeforeTax * $calculator->earningBeforeTaxToEBIT * $calculator->ebitMargin * $calculator->averageTotalAssetTurnOver * $calculator->averageFinancialLeverage, 1),
+                'ttm' => $quarter != 0
             ]);
             if ($i === 1 && $calculator->averageFinancialLeverage !== null && $calculator->averageFinancialLeverage < 0) {
                 $alert = 'Hệ số đòn bẩy tài chính trung bình (Tổng tài sản bq / VCSH bq) đang <strong>âm</strong> '

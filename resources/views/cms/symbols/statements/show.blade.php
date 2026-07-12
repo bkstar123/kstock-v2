@@ -50,8 +50,8 @@
 
         // Key-ratio tiles: [alias => [label, caption]]
         $keyMap = [
-            'ROE'                            => ['ROE (LN / VCSH)', null],
-            'ROS'                            => ['Biên LN ròng (ROS)', null],
+            'ROEA'                           => ['ROEA (LN / VCSH bình quân)', null],
+            'ROS2'                           => ['Biên LN ròng CĐ mẹ (ROS2)', null],
             'Gross profit margin'            => ['Biên LN gộp', null],
             'Revenue Growth YoY'             => ['Tăng trưởng DT (YoY)', 'Dương là tăng trưởng'],
             'Current Ratio'                  => ['Thanh toán hiện hành', '≥ 1 là đủ'],

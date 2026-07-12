@@ -57,19 +57,31 @@ class DupontCalculator extends BaseCalculator
             $operatingEffectivenessCalculator = new OperatingEffectivenessCalculator($this->financialStatement);
             $this->roaa = $profitabilityCalculator->calculateROAA($selectedYear, $selectedQuarter)->roaa;
             $this->averageFinancialLeverage = $financialLeverageCalculator->calculateAverageTotalAssetToAverageEquityRatio($selectedYear, $selectedQuarter)->averageTotalAssetToAverageEquityRatio;
-            $this->ros2 = $profitabilityCalculator->calculateROS2($selectedYear, $selectedQuarter)->ros2;
-            $this->ebitMargin = $profitabilityCalculator->calculateEBITMargin($selectedYear, $selectedQuarter)->ebitMargin;
             $this->averageTotalAssetTurnOver = $operatingEffectivenessCalculator->calculateTotalAssetTurnoverRatio($selectedYear, $selectedQuarter)->totalAssetTurnoverRatio;
-            $earningBeforeTax = $this->financialStatement->income_statement->getItem('15')->getValue($selectedYear, $selectedQuarter);
-            $earningAfterTaxParentCompany = $this->financialStatement->income_statement->getItem('21')->getValue($selectedYear, $selectedQuarter);
-            $earningAfterTax = $this->financialStatement->income_statement->getItem('19')->getValue($selectedYear, $selectedQuarter);
-            if ($earningBeforeTax != 0) {
-                $this->earningAfterTaxParentCompanyToEarningBeforeTax = round($earningAfterTaxParentCompany / $earningBeforeTax, 4);
-                $this->earningAfterTaxToEarningBeforeTax = round($earningAfterTax / $earningBeforeTax, 4);
+            // The margin/burden factors below are computed on a TTM basis (trailing 4
+            // quarters via ttmOrAnnual) so they share the same time frame as ROAA, the
+            // asset turnover and the leverage above. A quarter-only margin multiplied by
+            // an annualised (TTM) turnover breaks the DuPont identity, which is why
+            // Levels 3/5 previously reported an ROEA inconsistent with Level 2. The
+            // global calculateROS2()/calculateEBITMargin() (quarter-only) are left
+            // untouched — this TTM basis is specific to the DuPont decomposition.
+            $incomeStatement = $this->financialStatement->income_statement;
+            $netProfitParentTtm  = $this->ttmOrAnnual($incomeStatement->getItem('21'), $selectedYear, $selectedQuarter);
+            $netProfitTtm        = $this->ttmOrAnnual($incomeStatement->getItem('19'), $selectedYear, $selectedQuarter);
+            $earningBeforeTaxTtm = $this->ttmOrAnnual($incomeStatement->getItem('15'), $selectedYear, $selectedQuarter);
+            $interestTtm         = $this->ttmOrAnnual($incomeStatement->getItem('701'), $selectedYear, $selectedQuarter);
+            $revenueTtm          = $this->ttmOrAnnual($incomeStatement->getItem('3'), $selectedYear, $selectedQuarter);
+            $eBitTtm             = $earningBeforeTaxTtm + $interestTtm;
+            if ($revenueTtm != 0) {
+                $this->ros2 = round(100 * $netProfitParentTtm / $revenueTtm, 2);
+                $this->ebitMargin = round(100 * $eBitTtm / $revenueTtm, 2);
             }
-            $eBIT = $this->financialStatement->income_statement->getItem('15')->getValue($selectedYear, $selectedQuarter) + $this->financialStatement->income_statement->getItem('701')->getValue($selectedYear, $selectedQuarter);
-            if ($eBIT != 0) {
-                $this->earningBeforeTaxToEBIT = round($earningBeforeTax / $eBIT, 4);
+            if ($earningBeforeTaxTtm != 0) {
+                $this->earningAfterTaxParentCompanyToEarningBeforeTax = round($netProfitParentTtm / $earningBeforeTaxTtm, 4);
+                $this->earningAfterTaxToEarningBeforeTax = round($netProfitTtm / $earningBeforeTaxTtm, 4);
+            }
+            if ($eBitTtm != 0) {
+                $this->earningBeforeTaxToEBIT = round($earningBeforeTaxTtm / $eBitTtm, 4);
             }
         }
         return $this;
