@@ -941,6 +941,46 @@ if (! function_exists('businessSectorZAlias')) {
     }
 }
 
+if (! function_exists('marketDataTtl')) {
+    /**
+     * Cache TTL (seconds) for live market data (price, fundamentals), aware of the
+     * Vietnamese trading session (Mon–Fri 09:00–15:00 ICT).
+     *   - In session  -> $inSession (kept fresh).
+     *   - Off session -> seconds until the next session open (daily bars and
+     *     price-derived ratios are immutable until then, so serving the cached
+     *     value avoids pointless API calls).
+     *
+     * Timezone is explicit because config('app.timezone') defaults to UTC. Keeps
+     * no config() dependency so it stays unit-testable without the container.
+     *
+     * @param  int    $inSession  in-session TTL in seconds
+     * @param  array  $holidays   exchange-closed dates as 'Y-m-d' (Asia/Ho_Chi_Minh)
+     * @return int
+     */
+    function marketDataTtl($inSession = 900, array $holidays = [])
+    {
+        $now   = \Carbon\Carbon::now('Asia/Ho_Chi_Minh');
+        $open  = $now->copy()->setTime(9, 0);
+        $close = $now->copy()->setTime(15, 0);
+
+        $isTradingDay = function (\Carbon\Carbon $d) use ($holidays) {
+            return $d->isWeekday() && ! in_array($d->toDateString(), $holidays, true);
+        };
+
+        if ($isTradingDay($now) && $now->gte($open) && $now->lte($close)) {
+            return (int) $inSession;
+        }
+
+        $next = ($isTradingDay($now) && $now->lt($open))
+            ? $open
+            : $now->copy()->addDay()->setTime(9, 0);
+        while (! $isTradingDay($next)) {
+            $next->addDay();
+        }
+        return max(60, (int) abs($now->diffInSeconds($next)));
+    }
+}
+
 if (! function_exists('comparisonMetricCatalog')) {
     /**
      * Danh mục chỉ số dùng để so sánh nhiều mã cổ phiếu (bảng hợp nhất, ánh xạ khái niệm

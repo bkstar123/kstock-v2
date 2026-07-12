@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use Carbon\Carbon;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -11,6 +12,12 @@ use PHPUnit\Framework\TestCase;
  */
 class KstockHelpersTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow(null); // clear any frozen clock set by marketDataTtl tests
+        parent::tearDown();
+    }
+
     public function test_previous_period_of_q1_rolls_back_to_prior_year_q4()
     {
         $this->assertSame(['year' => 2021, 'quarter' => 4], getPreviousPeriod(2022, 1));
@@ -316,5 +323,46 @@ class KstockHelpersTest extends TestCase
         $this->assertNull(oppositeSignAlert(null, 20, $msg));
         $this->assertSame($msg, oppositeSignAlert(10, -20, $msg));
         $this->assertSame($msg, oppositeSignAlert(-10, 20, $msg));
+    }
+
+    // --- marketDataTtl(): TTL cache theo giờ giao dịch VN (T2–T6 09:00–15:00 ICT) ---
+
+    public function test_market_data_ttl_in_session_returns_in_session_value()
+    {
+        // Thứ Hai 2026-07-13 10:00 ICT — đang trong phiên.
+        Carbon::setTestNow(Carbon::create(2026, 7, 13, 10, 0, 0, 'Asia/Ho_Chi_Minh'));
+        $this->assertSame(300, marketDataTtl(300));
+    }
+
+    public function test_market_data_ttl_before_open_caches_until_today_open()
+    {
+        // Thứ Hai 2026-07-13 07:00 ICT — trước giờ mở cửa 2 tiếng.
+        Carbon::setTestNow(Carbon::create(2026, 7, 13, 7, 0, 0, 'Asia/Ho_Chi_Minh'));
+        $this->assertSame(2 * 3600, marketDataTtl(300));
+    }
+
+    public function test_market_data_ttl_after_close_on_friday_caches_until_monday_open()
+    {
+        // Thứ Sáu 2026-07-17 16:00 -> mở cửa kế tiếp là Thứ Hai 2026-07-20 09:00 (bỏ qua cuối tuần).
+        Carbon::setTestNow(Carbon::create(2026, 7, 17, 16, 0, 0, 'Asia/Ho_Chi_Minh'));
+        $expected = (2 * 24 + 17) * 3600; // 16:00 Fri -> 09:00 Mon = 65h
+        $this->assertSame($expected, marketDataTtl(300));
+    }
+
+    public function test_market_data_ttl_on_weekend_caches_until_monday_open()
+    {
+        // Thứ Bảy 2026-07-18 10:00 -> Thứ Hai 2026-07-20 09:00.
+        Carbon::setTestNow(Carbon::create(2026, 7, 18, 10, 0, 0, 'Asia/Ho_Chi_Minh'));
+        $expected = (24 + 23) * 3600; // 10:00 Sat -> 09:00 Mon = 47h
+        $this->assertSame($expected, marketDataTtl(300));
+    }
+
+    public function test_market_data_ttl_treats_holiday_as_closed()
+    {
+        // Thứ Hai 2026-07-13 10:00 nhưng là ngày nghỉ lễ -> coi như đóng cửa,
+        // cache tới Thứ Ba 2026-07-14 09:00 (không trả về giá trị in-session).
+        Carbon::setTestNow(Carbon::create(2026, 7, 13, 10, 0, 0, 'Asia/Ho_Chi_Minh'));
+        $expected = 23 * 3600; // 10:00 Mon -> 09:00 Tue = 23h
+        $this->assertSame($expected, marketDataTtl(300, ['2026-07-13']));
     }
 }

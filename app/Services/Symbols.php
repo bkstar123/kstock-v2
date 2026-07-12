@@ -57,7 +57,7 @@ class Symbols extends Base implements SymbolsInterface
     public function getProfile(string $symbol)
     {
         $enc = rawurlencode($symbol);
-        return $this->cachedGet("fa:profile:$enc", "/symbols/$enc/profile", 43200);
+        return $this->cachedGet("fa:profile:$enc", "/symbols/$enc/profile", 86400);
     }
 
     /**
@@ -71,7 +71,7 @@ class Symbols extends Base implements SymbolsInterface
     public function getFundamentalsData(string $symbol)
     {
         $enc = rawurlencode($symbol);
-        return $this->cachedGet("fa:fundamental:$enc", "/symbols/$enc/fundamental", 900);
+        return $this->cachedGet("fa:fundamental:$enc", "/symbols/$enc/fundamental", marketDataTtl(300, (array) config('market.holidays', [])));
     }
 
     /**
@@ -85,7 +85,7 @@ class Symbols extends Base implements SymbolsInterface
         $enc = rawurlencode($symbol);
         $path = "/symbols/$enc/historical-quotes?startDate=" . rawurlencode($startDate)
               . "&endDate=" . rawurlencode($endDate) . "&offset=0&limit=$limit";
-        return $this->cachedGet("fa:quotes:$enc:$startDate:$endDate:$limit", $path, 900);
+        return $this->cachedGet("fa:quotes:$enc:$startDate:$endDate:$limit", $path, marketDataTtl(300, (array) config('market.holidays', [])));
     }
 
     /**
@@ -109,7 +109,7 @@ class Symbols extends Base implements SymbolsInterface
     public function getHolders(string $symbol)
     {
         $enc = rawurlencode($symbol);
-        return $this->cachedGet("fa:holders:$enc", "/symbols/$enc/holders", 43200);
+        return $this->cachedGet("fa:holders:$enc", "/symbols/$enc/holders", 86400);
     }
 
     /**
@@ -120,7 +120,7 @@ class Symbols extends Base implements SymbolsInterface
     public function getDividends(string $symbol)
     {
         $enc = rawurlencode($symbol);
-        return $this->cachedGet("fa:dividends:$enc", "/symbols/$enc/dividends", 43200);
+        return $this->cachedGet("fa:dividends:$enc", "/symbols/$enc/dividends", 86400);
     }
 
     /**
