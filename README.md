@@ -50,7 +50,8 @@ settings, so no endpoint or secret is committed to source control.
 
 ```bash
 # 1. Install PHP dependencies
-composer install
+composer install                 # install PHP deps for LOCAL/CI (includes phpunit, faker, mockery for testing)
+composer install --no-dev --optimize-autoloader  # PRODUCTION ONLY — excludes dev dependencies (phpunit, faker, mockery, pail, collision)
 
 # 2. Environment
 cp .env.example .env
