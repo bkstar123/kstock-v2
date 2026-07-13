@@ -115,6 +115,32 @@ class CompanyDirectoryTest extends TestCase
             ->assertStatus(200)->assertSee('3.65');
     }
 
+    public function test_pb_excludes_nci_and_shows_book_period_with_stale_warning()
+    {
+        $admin = $this->admin();
+
+        // 2024 annual report: total equity 34e12 incl. NCI 4e12 -> parent equity 30e12.
+        $fs = FinancialStatement::create([
+            'symbol' => 'FPT', 'admin_id' => $admin->id, 'year' => 2024, 'quarter' => 0,
+        ]);
+        $fs->balance_statement()->create([
+            'content' => json_encode([
+                ['id' => '302', 'name' => 'VCSH', 'parentID' => 0, 'expanded' => true, 'level' => 1, 'field' => 'BS',
+                 'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 34000000000000]]],
+                ['id' => '3020114', 'name' => 'NCI', 'parentID' => 30201, 'expanded' => true, 'level' => 4, 'field' => 'BS',
+                 'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 4000000000000]]],
+            ]),
+        ]);
+
+        // 124,185,669,120,000 / 30e12 = 4.14 (NCI excluded; would be 3.65 if not).
+        $this->actingAs($admin, 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)
+            ->assertSee('4.14')
+            ->assertDontSee('3.65')
+            ->assertSee('book 2024')                        // book period label
+            ->assertSee('fa-exclamation-triangle', false);  // stale warning (2024 book, viewed later)
+    }
+
     public function test_show_unknown_company_redirects_to_directory()
     {
         $this->actingAs($this->admin(), 'admins')->get('/cms/companies/ZZZ')
