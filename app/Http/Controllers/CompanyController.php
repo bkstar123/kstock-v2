@@ -100,11 +100,86 @@ class CompanyController extends Controller
             ->exists();
 
         $priceToBook = $this->priceToBook($fundamentals, $statements->first());
+        $valuation = $this->valuation($this->symbols->getEstimatedPrice($symbol->code), $latestQuote);
+        $valuationRatios = $this->valuationRatios($this->symbols->getFinancialIndicators($symbol->code));
 
         return view('cms.companies.show', compact(
             'symbol', 'profile', 'fundamentals', 'latestQuote', 'statements', 'inWatchlist',
-            'priceToBook'
+            'priceToBook', 'valuation', 'valuationRatios'
         ));
+    }
+
+    /**
+     * Extract the P/E, P/S and P/B valuation multiples (company `value` vs peer
+     * `industryValue`) from the financial-indicators list, keeping that order.
+     * Returns null when none are present.
+     *
+     * @param  array|null  $indicators
+     * @return array<string, array{company: float|null, industry: float|null}>|null
+     */
+    private function valuationRatios($indicators)
+    {
+        if (!is_array($indicators)) {
+            return null;
+        }
+        $wanted = ['P/E', 'P/S', 'P/B'];
+        $found = [];
+        foreach ($indicators as $it) {
+            $short = $it['shortName'] ?? null;
+            if (in_array($short, $wanted, true) && !isset($found[$short])) {
+                $found[$short] = [
+                    'company'  => isset($it['value']) && is_numeric($it['value']) ? (float) $it['value'] : null,
+                    'industry' => isset($it['industryValue']) && is_numeric($it['industryValue']) ? (float) $it['industryValue'] : null,
+                ];
+            }
+        }
+        $ordered = [];
+        foreach ($wanted as $w) {
+            if (isset($found[$w])) {
+                $ordered[$w] = $found[$w];
+            }
+        }
+        return $ordered ?: null;
+    }
+
+    /**
+     * Build the valuation view-model from the external estimated-price payload
+     * (weighted DCF/PE/PB/Graham blend). Returns null when no fair value is
+     * available (financial institutions and unknown symbols return all-null).
+     * Estimated prices are full VND; the quote's priceClose is in thousands, so the
+     * current price is scaled by 1000 for a like-for-like upside/downside.
+     *
+     * @param  array|null  $estimated
+     * @param  array|null  $latestQuote
+     * @return array{fair: float, current: float|null, upsidePct: float|null, methods: array}|null
+     */
+    private function valuation($estimated, $latestQuote)
+    {
+        if (!is_array($estimated) || !isset($estimated['composedPrice']) || !is_numeric($estimated['composedPrice'])) {
+            return null;
+        }
+        $fair = (float) $estimated['composedPrice'];
+
+        $current = (isset($latestQuote['priceClose']) && is_numeric($latestQuote['priceClose']))
+            ? (float) $latestQuote['priceClose'] * 1000
+            : null;
+        $upsidePct = ($current && $current != 0) ? round(($fair - $current) / $current * 100, 1) : null;
+
+        $labels = [
+            'DCF' => 'DCF', 'PE' => 'P/E', 'PB' => 'P/B',
+            'Graham1' => 'Graham 1', 'Graham2' => 'Graham 2', 'Graham3' => 'Graham 3',
+        ];
+        $methods = [];
+        foreach ($labels as $key => $label) {
+            $price = $estimated["estimatedPrice{$key}"] ?? null;
+            $weight = $estimated["proportion{$key}"] ?? null;
+            if (is_numeric($price) && is_numeric($weight)) {
+                $methods[] = ['label' => $label, 'price' => (float) $price, 'weight' => (float) $weight];
+            }
+        }
+        usort($methods, fn ($a, $b) => $b['weight'] <=> $a['weight']);
+
+        return ['fair' => $fair, 'current' => $current, 'upsidePct' => $upsidePct, 'methods' => $methods];
     }
 
     /**

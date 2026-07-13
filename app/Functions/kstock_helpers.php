@@ -1006,6 +1006,35 @@ if (! function_exists('marketHolidays')) {
     }
 }
 
+if (! function_exists('profileHtmlToText')) {
+    /**
+     * Convert the external API's rich company-profile HTML (overview/history/
+     * businessAreas — often <ul><li> lists with HTML entities) into safe plain
+     * text that preserves structure as bulleted lines. All tags are stripped (so
+     * the caller can echo it escaped, no XSS), list items become "• " lines, and
+     * <br>/</p> become line breaks. Render inside a white-space:pre-line container.
+     *
+     * @param  string|null  $html
+     * @return string|null
+     */
+    function profileHtmlToText($html)
+    {
+        if (!is_string($html) || trim($html) === '') {
+            return null;
+        }
+        $s = html_entity_decode($html, ENT_QUOTES | ENT_HTML5);
+        $s = preg_replace('#<li[^>]*>#i', "\n• ", $s);
+        $s = preg_replace('#</li>#i', '', $s);
+        $s = preg_replace('#<br\s*/?>#i', "\n", $s);
+        $s = preg_replace('#</(p|div|tr|h[1-6])\s*>#i', "\n", $s);
+        $s = strip_tags($s);
+        $s = preg_replace('/\n[ \t]+/', "\n", $s);   // drop per-line leading indent (nested lists)
+        $s = preg_replace('/[ \t]+\n/', "\n", $s);   // drop trailing spaces
+        $s = preg_replace("/\n{3,}/", "\n\n", $s);
+        return trim($s);
+    }
+}
+
 if (! function_exists('comparisonMetricCatalog')) {
     /**
      * Danh mục chỉ số dùng để so sánh nhiều mã cổ phiếu (bảng hợp nhất, ánh xạ khái niệm

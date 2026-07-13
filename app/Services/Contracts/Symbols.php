@@ -79,4 +79,18 @@ interface Symbols
      * @return array|null
      */
     public function getDividends(string $symbol);
+
+    /**
+     * Estimated fair value (weighted DCF/PE/PB/Graham blend).
+     *
+     * @return array|null
+     */
+    public function getEstimatedPrice(string $symbol);
+
+    /**
+     * Financial indicators with company value and peer industryValue.
+     *
+     * @return array|null
+     */
+    public function getFinancialIndicators(string $symbol);
 }

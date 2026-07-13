@@ -124,6 +124,35 @@ class Symbols extends Base implements SymbolsInterface
     }
 
     /**
+     * Estimated fair value: a weighted blend of DCF, P/E, P/B and 3 Graham methods
+     * (each `estimatedPrice*` + its `proportion*` weight, plus the blended
+     * `composedPrice`). Values are in full VND. Fields are all null for financial
+     * institutions (banks/securities/insurance). External API:
+     * GET /symbols/{symbol}/estimated-price
+     *
+     * @return array|null
+     */
+    public function getEstimatedPrice(string $symbol)
+    {
+        $enc = rawurlencode($symbol);
+        return $this->cachedGet("fa:estimated:$enc", "/symbols/$enc/estimated-price", marketDataTtl(300, marketHolidays()));
+    }
+
+    /**
+     * Financial indicators: a list of ratios (P/E, P/S, P/B, EPS, margins, ROE...),
+     * each with the company `value` and the peer `industryValue`. Price-derived
+     * multiples move intraday, so use the trading-session-aware TTL. External API:
+     * GET /symbols/{symbol}/financial-indicators
+     *
+     * @return array|null
+     */
+    public function getFinancialIndicators(string $symbol)
+    {
+        $enc = rawurlencode($symbol);
+        return $this->cachedGet("fa:indicators:$enc", "/symbols/$enc/financial-indicators", marketDataTtl(300, marketHolidays()));
+    }
+
+    /**
      * Get full financial statement of a symbol
      *
      * @param string $symbol

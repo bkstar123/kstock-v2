@@ -137,9 +137,91 @@
                         </table>
                     </div>
                 </div>
+
+                {{-- Bội số định giá: doanh nghiệp vs ngành --}}
+                @if($valuationRatios)
+                    <h5 class="mt-3">Định giá so với ngành</h5>
+                    <table class="table table-sm" style="max-width:440px">
+                        <thead><tr><th>Chỉ số</th><th class="text-right">Doanh nghiệp</th><th class="text-right">Ngành</th></tr></thead>
+                        <tbody>
+                            @foreach($valuationRatios as $label => $r)
+                                @php
+                                    $cmp = ($r['company'] !== null && $r['industry'] !== null)
+                                        ? ($r['company'] < $r['industry'] ? 'low' : ($r['company'] > $r['industry'] ? 'high' : 'eq'))
+                                        : null;
+                                @endphp
+                                <tr>
+                                    <td>{{ $label }}</td>
+                                    <td class="text-right {{ $cmp === 'low' ? 'text-success' : ($cmp === 'high' ? 'text-danger' : '') }}"
+                                        title="{{ $cmp === 'low' ? 'Thấp hơn trung bình ngành' : ($cmp === 'high' ? 'Cao hơn trung bình ngành' : '') }}">
+                                        <strong>{{ $r['company'] !== null ? number_format($r['company'], 2) : '—' }}</strong>
+                                    </td>
+                                    <td class="text-right text-muted">{{ $r['industry'] !== null ? number_format($r['industry'], 2) : '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <p class="text-muted" style="font-size:.78rem">Bội số của doanh nghiệp so với trung bình ngành. Thấp hơn ngành (xanh) = định giá rẻ hơn tương đối; cao hơn (đỏ) = đắt hơn.</p>
+                @endif
+
+                {{-- Định giá (tham khảo) --}}
+                <h5 class="mt-3">Định giá <small class="text-muted">(tham khảo)</small></h5>
+                @if($valuation)
+                    @php $up = $valuation['upsidePct']; @endphp
+                    <div class="ks-val">
+                        <div class="ks-val-head">
+                            <div>
+                                <div class="ks-val-fair">{{ number_format($valuation['fair']/1000, 1) }}
+                                    <small class="text-muted">nghìn / cp · giá trị hợp lý</small>
+                                </div>
+                                @if($up !== null)
+                                    <span class="badge {{ $up >= 0 ? 'badge-success' : 'badge-danger' }} ks-val-badge">
+                                        <i class="fas fa-arrow-{{ $up >= 0 ? 'up' : 'down' }}"></i>
+                                        {{ $up >= 0 ? 'Tiềm năng tăng' : 'Cao hơn giá trị hợp lý' }} {{ number_format(abs($up), 1) }}%
+                                    </span>
+                                    <small class="text-muted">so với giá hiện tại {{ number_format($valuation['current']/1000, 1) }}</small>
+                                @endif
+                            </div>
+                        </div>
+                        @php $maxW = max(array_map(fn($m) => $m['weight'], $valuation['methods']) ?: [1]); @endphp
+                        <table class="table table-sm ks-val-methods mt-2">
+                            <thead><tr><th>Phương pháp</th><th class="text-right">Giá ước tính</th><th style="width:34%">Trọng số</th></tr></thead>
+                            <tbody>
+                                @foreach($valuation['methods'] as $m)
+                                    <tr>
+                                        <td>{{ $m['label'] }}</td>
+                                        <td class="text-right">{{ number_format($m['price']/1000, 1) }}</td>
+                                        <td>
+                                            <div class="ks-val-bar-wrap">
+                                                <span class="ks-val-bar" style="width: {{ round($m['weight']/$maxW*100) }}%"></span>
+                                                <span class="ks-val-bar-num">{{ number_format($m['weight'], 1) }}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                        <p class="text-muted ks-val-note mb-0">
+                            <i class="fas fa-info-circle"></i>
+                            Giá trị hợp lý là bình quân có trọng số của {{ count($valuation['methods']) }} phương pháp (DCF, P/E, P/B, Graham).
+                            Đây là ước tính từ nhà cung cấp dữ liệu, chỉ mang tính tham khảo, <strong>không phải khuyến nghị đầu tư</strong>.
+                        </p>
+                    </div>
+                @else
+                    <p class="text-muted">Định giá không khả dụng cho mã này (định chế tài chính không được mô hình DCF/Graham định giá).</p>
+                @endif
+
                 @if(!empty($p['overview']))
-                    <h5 class="mt-3">Overview</h5>
-                    <p style="text-align:justify">{{ trim(html_entity_decode(strip_tags($p['overview']))) }}</p>
+                    <h5 class="mt-3">Tổng quan</h5>
+                    <p style="text-align:justify; white-space:pre-line">{{ profileHtmlToText($p['overview']) }}</p>
+                @endif
+                @if(!empty($p['businessAreas']))
+                    <h5 class="mt-3">Lĩnh vực kinh doanh</h5>
+                    <div style="white-space:pre-line">{{ profileHtmlToText($p['businessAreas']) }}</div>
+                @endif
+                @if(!empty($p['history']))
+                    <h5 class="mt-3">Lịch sử hình thành</h5>
+                    <div style="white-space:pre-line">{{ profileHtmlToText($p['history']) }}</div>
                 @endif
             </div>
 
@@ -186,6 +268,20 @@
     </div>
 </div>
 @endsection
+
+@push('css')
+<style>
+    .ks-val-fair { font-size: 1.9rem; font-weight: 800; line-height: 1.1; color: var(--ks-ink, #0f172a); }
+    .ks-val-fair small { font-size: .8rem; font-weight: 500; }
+    .ks-val-badge { font-size: .8rem; margin: .35rem .5rem .35rem 0; }
+    .ks-val-methods td, .ks-val-methods th { vertical-align: middle; font-size: .86rem; }
+    .ks-val-bar-wrap { position: relative; display: flex; align-items: center; gap: .5rem; }
+    .ks-val-bar { display: inline-block; height: 8px; border-radius: 999px;
+        background: var(--ks-primary, #6366f1); min-width: 2px; flex: 0 0 auto; }
+    .ks-val-bar-num { font-size: .78rem; color: var(--ks-muted, #64748b); font-weight: 600; }
+    .ks-val-note { font-size: .78rem; }
+</style>
+@endpush
 
 @push('scriptBottom')
 <script src="{{ url('/js/vendor/highcharts/highcharts.js') }}"></script>

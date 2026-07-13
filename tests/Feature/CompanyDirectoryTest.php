@@ -141,6 +141,43 @@ class CompanyDirectoryTest extends TestCase
             ->assertSee('fa-exclamation-triangle', false);  // stale warning (2024 book, viewed later)
     }
 
+    public function test_valuation_block_shows_fair_value_and_breakdown()
+    {
+        // FakeSymbols FPT: composedPrice 70,300 (VND) -> 70.3; latest close 130.5
+        // -> current 130,500 -> overvalued (~46% above fair value).
+        $this->actingAs($this->admin(), 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)
+            ->assertSee('70.3')                          // blended fair value (nghìn)
+            ->assertSee('DCF')                           // method breakdown
+            ->assertSee('Graham 1')
+            ->assertSee('Cao hơn giá trị hợp lý')        // downside badge
+            ->assertSee('không phải khuyến nghị đầu tư'); // disclaimer
+    }
+
+    public function test_valuation_unavailable_when_all_methods_null()
+    {
+        // FakeSymbols VNM returns an all-null estimated-price (like a bank/insurer).
+        $this->actingAs($this->admin(), 'admins')->get('/cms/companies/VNM')
+            ->assertStatus(200)
+            ->assertSee('Định giá không khả dụng');
+    }
+
+    public function test_profile_shows_industry_multiples_history_and_business_areas()
+    {
+        $this->actingAs($this->admin(), 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)
+            // P/E, P/S, P/B — company value vs industryValue
+            ->assertSee('Định giá so với ngành')
+            ->assertSee('12.48')->assertSee('12.67')   // P/E company / industry
+            ->assertSee('1.82')->assertSee('1.58')     // P/S company / industry
+            ->assertSee('2.75')                        // P/B industry
+            // history + business areas (entities decoded, tags stripped to bullet lines)
+            ->assertSee('Lĩnh vực kinh doanh')
+            ->assertSee('Công nghệ')
+            ->assertSee('Lịch sử hình thành')
+            ->assertSee('1988: Thành lập');
+    }
+
     public function test_show_unknown_company_redirects_to_directory()
     {
         $this->actingAs($this->admin(), 'admins')->get('/cms/companies/ZZZ')
