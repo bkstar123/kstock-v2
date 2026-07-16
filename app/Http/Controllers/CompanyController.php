@@ -11,7 +11,6 @@ use App\Models\Symbol;
 use App\Models\Watchlist;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use App\Services\SymbolCatalog;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
@@ -99,9 +98,11 @@ class CompanyController extends Controller
             ->where('symbol_code', $symbol->code)
             ->exists();
 
-        $priceToBook = $this->priceToBook($fundamentals, $statements->first());
         $valuation = $this->valuation($this->symbols->getEstimatedPrice($symbol->code), $latestQuote);
         $valuationRatios = $this->valuationRatios($this->symbols->getFinancialIndicators($symbol->code));
+        // P/B for the headline card now comes straight from the API (fresh, and
+        // available for every company type) rather than being derived from equity.
+        $priceToBook = $valuationRatios['P/B']['company'] ?? null;
 
         return view('cms.companies.show', compact(
             'symbol', 'profile', 'fundamentals', 'latestQuote', 'statements', 'inWatchlist',
@@ -180,59 +181,6 @@ class CompanyController extends Controller
         usort($methods, fn ($a, $b) => $b['weight'] <=> $a['weight']);
 
         return ['fair' => $fair, 'current' => $current, 'upsidePct' => $upsidePct, 'methods' => $methods];
-    }
-
-    /**
-     * Trailing Price-to-Book, derived (the external fundamental endpoint doesn't
-     * expose P/B): current market cap / book value of equity attributable to the
-     * PARENT company = total equity (item 302) minus non-controlling interests
-     * (item 3020114), so the denominator matches the parent's listed shares behind
-     * the market cap. Book value is taken from the latest pulled statement, so the
-     * result carries the book period and a "stale" flag: today's market cap paired
-     * with an old book value (e.g. a 2024 annual report) can misstate P/B.
-     *
-     * Market cap and statement values share the same full-VND scale. Returns null
-     * when market cap or a balance statement is unavailable, or parent equity is
-     * non-positive (P/B not meaningful).
-     *
-     * @param  array|null  $fundamentals
-     * @param  \App\Models\FinancialStatement|null  $latest
-     * @return array{value: float, period: string, stale: bool}|null
-     */
-    private function priceToBook($fundamentals, $latest)
-    {
-        $marketCap = $fundamentals['marketCap'] ?? null;
-        if (!is_numeric($marketCap) || !$latest || !$latest->balance_statement) {
-            return null;
-        }
-        $equityItem = $latest->balance_statement->getItem('302');
-        if (!$equityItem) {
-            return null;
-        }
-        $totalEquity = $equityItem->getValue($latest->year, $latest->quarter);
-        $nciItem = $latest->balance_statement->getItem('3020114'); // Lợi ích cổ đông không kiểm soát
-        $nci = $nciItem ? $nciItem->getValue($latest->year, $latest->quarter) : 0.0;
-        $parentEquity = $totalEquity - $nci;
-        if ($parentEquity <= 0) {
-            return null;
-        }
-        return [
-            'value'  => round($marketCap / $parentEquity, 2),
-            'period' => $latest->quarter != 0 ? "Q{$latest->quarter} {$latest->year}" : "{$latest->year}",
-            'stale'  => $this->bookValueIsStale($latest->year, $latest->quarter),
-        ];
-    }
-
-    /**
-     * A book value is "stale" for P/B once its reporting period ended more than two
-     * quarters (~6 months) ago — today's market cap is then paired with a clearly
-     * outdated equity figure. Pulling a newer report refreshes it.
-     */
-    private function bookValueIsStale($year, $quarter)
-    {
-        $endMonth = $quarter == 0 ? 12 : $quarter * 3;
-        $periodEnd = Carbon::create((int) $year, $endMonth, 1)->endOfMonth();
-        return $periodEnd->lt(Carbon::now()->subMonths(6));
     }
 
     /**

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\FinancialStatement;
 use App\Models\Symbol;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
@@ -87,58 +86,15 @@ class CompanyDirectoryTest extends TestCase
         $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
     }
 
-    public function test_show_displays_pb_card_even_without_statements()
+    public function test_pb_card_uses_api_value_without_needing_a_statement()
     {
-        // P/B card label always renders; value is "—" when no book value is available.
+        // P/B now comes straight from the financial-indicators API (FakeSymbols FPT
+        // P/B = 3.10) — no pulled statement or derivation, and no book/stale UI.
         $this->actingAs($this->admin(), 'admins')->get('/cms/companies/FPT')
-            ->assertStatus(200)->assertSee('P/B');
-    }
-
-    public function test_pb_is_derived_from_market_cap_and_latest_equity()
-    {
-        $admin = $this->admin();
-
-        // Latest balance statement exposing total equity (item 302 = VCSH).
-        $fs = FinancialStatement::create([
-            'symbol' => 'FPT', 'admin_id' => $admin->id, 'year' => 2024, 'quarter' => 0,
-        ]);
-        $fs->balance_statement()->create([
-            'content' => json_encode([[
-                'id' => '302', 'name' => 'VCSH', 'parentID' => 0, 'expanded' => true,
-                'level' => 1, 'field' => 'BS',
-                'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 34000000000000]],
-            ]]),
-        ]);
-
-        // FakeSymbols market cap for FPT = 124,185,669,120,000 → P/B ≈ 3.65.
-        $this->actingAs($admin, 'admins')->get('/cms/companies/FPT')
-            ->assertStatus(200)->assertSee('3.65');
-    }
-
-    public function test_pb_excludes_nci_and_shows_book_period_with_stale_warning()
-    {
-        $admin = $this->admin();
-
-        // 2024 annual report: total equity 34e12 incl. NCI 4e12 -> parent equity 30e12.
-        $fs = FinancialStatement::create([
-            'symbol' => 'FPT', 'admin_id' => $admin->id, 'year' => 2024, 'quarter' => 0,
-        ]);
-        $fs->balance_statement()->create([
-            'content' => json_encode([
-                ['id' => '302', 'name' => 'VCSH', 'parentID' => 0, 'expanded' => true, 'level' => 1, 'field' => 'BS',
-                 'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 34000000000000]]],
-                ['id' => '3020114', 'name' => 'NCI', 'parentID' => 30201, 'expanded' => true, 'level' => 4, 'field' => 'BS',
-                 'values' => [['year' => 2024, 'quarter' => 0, 'period' => '2024', 'value' => 4000000000000]]],
-            ]),
-        ]);
-
-        // 124,185,669,120,000 / 30e12 = 4.14 (NCI excluded; would be 3.65 if not).
-        $this->actingAs($admin, 'admins')->get('/cms/companies/FPT')
             ->assertStatus(200)
-            ->assertSee('4.14')
-            ->assertDontSee('3.65')
-            ->assertSee('book 2024')                        // book period label
-            ->assertSee('fa-exclamation-triangle', false);  // stale warning (2024 book, viewed later)
+            ->assertSee('P/B')
+            ->assertSee('3.10')
+            ->assertDontSee('· book');
     }
 
     public function test_valuation_block_shows_fair_value_and_breakdown()

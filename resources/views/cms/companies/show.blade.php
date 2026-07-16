@@ -65,17 +65,8 @@
     <div class="col-6 col-lg mb-3">
         <div class="small-box bg-secondary">
             <div class="inner">
-                <h3 style="font-size:1.6rem">{{ $priceToBook !== null ? number_format($priceToBook['value'], 2) : '—' }}</h3>
-                <p>
-                    P/B
-                    @if($priceToBook !== null)
-                        <small style="opacity:.85">· book {{ $priceToBook['period'] }}</small>
-                        @if($priceToBook['stale'])
-                            <i class="fas fa-exclamation-triangle"
-                               title="Book value từ kỳ {{ $priceToBook['period'] }} có thể đã cũ so với vốn hóa hiện tại nên P/B có thể bị lệch (thường bị thổi cao). Pull báo cáo tài chính mới hơn để chính xác."></i>
-                        @endif
-                    @endif
-                </p>
+                <h3 style="font-size:1.6rem">{{ $priceToBook !== null ? number_format($priceToBook, 2) : '—' }}</h3>
+                <p>P/B</p>
             </div>
             <div class="icon"><i class="fas fa-book"></i></div>
         </div>
