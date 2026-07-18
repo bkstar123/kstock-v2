@@ -55,6 +55,35 @@ class CompanyDirectoryTest extends TestCase
         $this->assertDatabaseHas('symbols', ['code' => 'FPT', 'exchange' => 'HSX']);
     }
 
+    public function test_destroy_removes_a_symbol_from_the_directory()
+    {
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+
+        $this->actingAs($this->admin(), 'admins')
+            ->delete('/cms/companies/FPT')
+            ->assertRedirect(route('cms.companies.index'));
+
+        $this->assertDatabaseMissing('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_destroy_is_a_no_op_for_an_unknown_symbol()
+    {
+        $this->actingAs($this->admin(), 'admins')
+            ->delete('/cms/companies/ZZZ')
+            ->assertRedirect(route('cms.companies.index'));
+
+        $this->assertDatabaseCount('symbols', 0);
+    }
+
+    public function test_guest_cannot_destroy_a_symbol()
+    {
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+
+        $this->delete('/cms/companies/FPT')->assertRedirect();
+
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+    }
+
     public function test_store_rejects_an_unknown_symbol()
     {
         $this->actingAs($this->admin(), 'admins')

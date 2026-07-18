@@ -195,6 +195,13 @@ a { transition: color .15s ease; }
     border-color: var(--ks-primary) !important;
     box-shadow: 0 0 0 3px rgba(99,102,241,.18) !important;
 }
+/* .form-control's padding above (same specificity, later in cascade) was
+   clobbering .form-control-sm's smaller padding while its fixed height stayed
+   put, clipping the select/input text vertically. Restore Bootstrap's own
+   compact padding so it fits the sm height again. */
+.form-control-sm {
+    padding: .25rem .5rem !important;
+}
 .input-group-text {
     border-radius: var(--ks-radius-sm) !important;
     border: 1px solid var(--ks-border) !important;

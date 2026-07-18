@@ -90,6 +90,7 @@ Route::group(
         // Symbol directory
         Route::get('companies', 'CompanyController@index')->name('cms.companies.index');
         Route::post('companies', 'CompanyController@store')->name('cms.companies.store');
+        Route::delete('companies/{code}', 'CompanyController@destroy')->name('cms.companies.destroy');
         // Company profile hub
         Route::get('companies/{code}', 'CompanyController@show')->name('cms.companies.show');
         Route::get('companies/{code}/price-history', 'CompanyController@priceHistory')->name('cms.companies.priceHistory');

@@ -75,6 +75,27 @@ class CompanyController extends Controller
     }
 
     /**
+     * Remove a symbol from the local directory. Any financial statements,
+     * analysis reports or watchlist entries already saved for it are untouched;
+     * the symbol is simply re-synced on demand (e.g. via the catalog) if it's
+     * looked up again later.
+     */
+    public function destroy(string $code)
+    {
+        $symbol = Symbol::where('code', strtoupper($code))->first();
+
+        if (!$symbol) {
+            flashing('No such symbol in the directory')->error()->flash();
+            return redirect()->route('cms.companies.index');
+        }
+
+        $symbol->delete();
+
+        flashing("{$symbol->code} removed from the directory")->success()->flash();
+        return redirect()->route('cms.companies.index');
+    }
+
+    /**
      * Company profile hub.
      */
     public function show(string $code)

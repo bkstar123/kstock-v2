@@ -74,7 +74,7 @@
                             <td>{{ $company->name }}</td>
                             <td>@if($company->exchange)<span class="badge badge-secondary">{{ $company->exchange }}</span>@endif</td>
                             <td>{{ $company->company_type }}</td>
-                            <td class="text-right">
+                            <td class="text-right text-nowrap">
                                 <a href="{{ route('cms.companies.show', ['code' => $company->code]) }}" class="btn btn-sm btn-primary">
                                     <i class="fas fa-chart-line"></i> View
                                 </a>
@@ -83,6 +83,13 @@
                                     <input type="hidden" name="symbol" value="{{ $company->code }}">
                                     <button class="btn btn-sm btn-warning" type="submit" title="Add to watchlist">
                                         <i class="far fa-star"></i>
+                                    </button>
+                                </form>
+                                <form action="{{ route('cms.companies.destroy', ['code' => $company->code]) }}" method="POST" style="display:inline"
+                                      onsubmit="return confirm('Remove {{ $company->code }} from the directory?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-sm btn-danger" type="submit" title="Remove from directory">
+                                        <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
                             </td>
