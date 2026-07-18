@@ -23,8 +23,16 @@ metrics whose statement line‑items differ entirely from ordinary companies).
 - **Automated ratio analysis** — 100+ ratios computed per statement, grouped and
   presented with formulas, reference thresholds, and a rolling multi‑period
   window (TTM‑adjusted for quarterly reports).
-- **Company hub** — profile, fundamentals and interactive OHLCV price charts.
+- **Company hub** — profile, fundamentals, interactive OHLCV price charts, and the
+  provider's business history/areas.
+- **Valuation** — provider‑estimated fair value (weighted DCF / P/E / P/B / Graham
+  blend, with per‑method breakdown and upside/downside vs current price — not
+  available for financial institutions), plus P/E, P/S and P/B benchmarked against
+  the industry average.
 - **Comparison tool** — compare ratios side‑by‑side across multiple tickers.
+- **Data freshness** — live quotes/fundamentals are cached session‑aware (fresh
+  during VN trading hours, held until the next session otherwise); admins configure
+  exchange holidays via Settings → Refresh Calendar.
 - **Watchlist** — per‑admin followed tickers with live price / P/E / market cap.
 - **Role‑based admin panel** — authentication, authorization, settings.
 
@@ -278,6 +286,12 @@ công ty mẹ · Tổng tài sản · Nợ dài hạn · Nợ phải trả · N�
 | 2‑factor | ROEA = ROAA × (Tổng tài sản bình quân / VCSH bình quân) |
 | 3‑factor | ROEA = ROS2 × Vòng quay tổng tài sản bình quân × Đòn bẩy tài chính trung bình |
 | 5‑factor | ROEA = (LNST mẹ / LNTT) × (LNTT / EBIT) × (EBIT / Doanh thu thuần) × Vòng quay tổng tài sản bình quân × Đòn bẩy tài chính trung bình |
+
+> For quarterly reports, the margin/burden factors feeding Levels 3 and 5
+> (ROS2, EBIT margin and the LNTT/LNST burden ratios above) are computed on a
+> **TTM basis** so they share the same time frame as ROAA, asset turnover and
+> leverage and reconcile with Level 2's ROEA — the standalone ROS2/EBIT‑margin
+> ratios elsewhere in this catalogue (§1.1) remain quarter‑only.
 
 #### 1.13 Altman Z‑Score — *Nguy cơ phá sản*
 
