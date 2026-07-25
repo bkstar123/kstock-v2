@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\DirectoryEntry;
 use App\Models\Symbol;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
+use Bkstar123\BksCMS\AdminPanel\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\FakeSymbols;
 use Tests\TestCase;
@@ -19,12 +21,28 @@ class CompanyDirectoryTest extends TestCase
         $this->app->instance(SymbolsInterface::class, new FakeSymbols());
     }
 
+    private int $adminSeq = 0;
+
     private function admin(): Admin
     {
+        $n = ++$this->adminSeq;
         return Admin::create([
-            'name' => 'Dir', 'username' => 'dir', 'email' => 'dir@example.com',
+            'name' => "Dir{$n}", 'username' => "dir{$n}", 'email' => "dir{$n}@example.com",
             'password' => bcrypt('secret123'),
         ])->refresh();
+    }
+
+    private function superadmin(): Admin
+    {
+        $admin = $this->admin();
+        $role = Role::firstOrCreate(['role' => 'Super Administrators'], ['description' => 'test']);
+        // The gate keys on Role::SUPERADMINS (id 1); pin the id so hasRole() matches.
+        if ($role->id !== Role::SUPERADMINS) {
+            $role->id = Role::SUPERADMINS;
+            $role->save();
+        }
+        $admin->roles()->attach(Role::SUPERADMINS);
+        return $admin->refresh();
     }
 
     public function test_guest_is_redirected_from_directory()
@@ -32,12 +50,14 @@ class CompanyDirectoryTest extends TestCase
         $this->get('/cms/companies')->assertRedirect();
     }
 
-    public function test_admin_sees_directory_and_search_filters()
+    public function test_admin_sees_only_their_own_directory_and_search_filters()
     {
         Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
         Symbol::create(['code' => 'VNM', 'name' => 'CTCP Sua Viet Nam', 'exchange' => 'HSX']);
 
         $admin = $this->admin();
+        DirectoryEntry::create(['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
+        DirectoryEntry::create(['admin_id' => $admin->id, 'symbol_code' => 'VNM']);
 
         $this->actingAs($admin, 'admins')->get('/cms/companies')
             ->assertStatus(200)->assertSee('FPT')->assertSee('VNM');
@@ -46,42 +66,77 @@ class CompanyDirectoryTest extends TestCase
             ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
     }
 
-    public function test_store_adds_a_known_symbol()
+    public function test_admin_does_not_see_another_admins_directory()
     {
-        $this->actingAs($this->admin(), 'admins')
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        Symbol::create(['code' => 'VNM', 'name' => 'CTCP Sua Viet Nam', 'exchange' => 'HSX']);
+
+        $a = $this->admin();
+        $b = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        DirectoryEntry::create(['admin_id' => $b->id, 'symbol_code' => 'VNM']);
+
+        $this->actingAs($a, 'admins')->get('/cms/companies')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
+    }
+
+    public function test_superadmin_sees_the_whole_catalog()
+    {
+        // A symbol in nobody's directory is still visible to a superadmin.
+        Symbol::create(['code' => 'HPG', 'name' => 'CTCP Tap doan Hoa Phat', 'exchange' => 'HSX']);
+
+        $this->actingAs($this->superadmin(), 'admins')->get('/cms/companies')
+            ->assertStatus(200)->assertSee('HPG');
+    }
+
+    public function test_store_adds_a_known_symbol_to_the_actors_directory()
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin, 'admins')
             ->post('/cms/companies', ['symbol' => 'FPT'])
             ->assertRedirect(route('cms.companies.show', ['code' => 'FPT']));
 
         $this->assertDatabaseHas('symbols', ['code' => 'FPT', 'exchange' => 'HSX']);
+        $this->assertDatabaseHas('directory_entries', ['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
     }
 
-    public function test_destroy_removes_a_symbol_from_the_directory()
+    public function test_destroy_removes_only_the_actors_entry_and_keeps_the_master_row()
     {
         Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        $b = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        DirectoryEntry::create(['admin_id' => $b->id, 'symbol_code' => 'FPT']);
 
-        $this->actingAs($this->admin(), 'admins')
+        $this->actingAs($a, 'admins')->from('/cms/companies')
             ->delete('/cms/companies/FPT')
-            ->assertRedirect(route('cms.companies.index'));
+            ->assertRedirect('/cms/companies');
 
-        $this->assertDatabaseMissing('symbols', ['code' => 'FPT']);
+        // Only A's entry is gone; B's entry and the shared master row survive.
+        $this->assertDatabaseMissing('directory_entries', ['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('directory_entries', ['admin_id' => $b->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
     }
 
-    public function test_destroy_is_a_no_op_for_an_unknown_symbol()
+    public function test_destroy_is_a_no_op_for_an_unentered_symbol()
     {
-        $this->actingAs($this->admin(), 'admins')
+        $this->actingAs($this->admin(), 'admins')->from('/cms/companies')
             ->delete('/cms/companies/ZZZ')
-            ->assertRedirect(route('cms.companies.index'));
+            ->assertRedirect('/cms/companies');
 
-        $this->assertDatabaseCount('symbols', 0);
+        $this->assertDatabaseCount('directory_entries', 0);
     }
 
-    public function test_guest_cannot_destroy_a_symbol()
+    public function test_guest_cannot_destroy_an_entry()
     {
         Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $admin = $this->admin();
+        DirectoryEntry::create(['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
 
         $this->delete('/cms/companies/FPT')->assertRedirect();
 
-        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+        $this->assertDatabaseHas('directory_entries', ['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
     }
 
     public function test_store_rejects_an_unknown_symbol()

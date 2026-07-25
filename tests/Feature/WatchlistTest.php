@@ -19,10 +19,13 @@ class WatchlistTest extends TestCase
         $this->app->instance(SymbolsInterface::class, new FakeSymbols());
     }
 
+    private int $adminSeq = 0;
+
     private function admin(): Admin
     {
+        $n = ++$this->adminSeq;
         return Admin::create([
-            'name' => 'W', 'username' => 'w', 'email' => 'w@example.com',
+            'name' => "W{$n}", 'username' => "w{$n}", 'email' => "w{$n}@example.com",
             'password' => bcrypt('secret123'),
         ])->refresh();
     }
@@ -85,5 +88,16 @@ class WatchlistTest extends TestCase
             ->assertRedirect('/cms/watchlist');
 
         $this->assertDatabaseCount('watchlists', 0);
+    }
+
+    public function test_admin_does_not_see_another_admins_watchlist()
+    {
+        $a = $this->admin();
+        $b = $this->admin();
+        Watchlist::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        Watchlist::create(['admin_id' => $b->id, 'symbol_code' => 'VNM']);
+
+        $this->actingAs($a, 'admins')->get('/cms/watchlist')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
     }
 }

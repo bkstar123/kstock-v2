@@ -6,11 +6,13 @@
  */
 namespace App\Http\Controllers;
 
+use App\Models\DirectoryEntry;
 use App\Models\FinancialStatement;
 use App\Models\Symbol;
 use App\Models\Watchlist;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use App\Services\SymbolCatalog;
+use Bkstar123\BksCMS\AdminPanel\Role;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
@@ -32,26 +34,39 @@ class CompanyController extends Controller
     }
 
     /**
-     * Searchable symbol directory (local master table).
+     * Searchable symbol directory. Personalised per admin: a regular admin sees
+     * only the symbols in their own directory; a superadmin sees the whole master
+     * catalog (mirrors the financial-statement listing rule).
      */
     public function index(Request $request)
     {
         $search = $request->input('search');
         $exchange = $request->input('exchange');
 
+        $me = auth()->guard('admins')->user();
+        $isSuper = $me->hasRole(Role::SUPERADMINS);
+        // Codes the current admin has added to their own directory. Drives both the
+        // regular-admin filter and (for everyone) which rows show a Remove button.
+        $ownedCodes = DirectoryEntry::where('admin_id', $me->id)->pluck('symbol_code')->all();
+
+        $mineOnly = fn ($q) => $q->whereIn('code',
+            DirectoryEntry::where('admin_id', $me->id)->select('symbol_code'));
+
         $companies = Symbol::search($search)
             ->when($exchange, fn ($q) => $q->where('exchange', $exchange))
+            ->when(!$isSuper, $mineOnly)
             ->orderBy('code')
             ->paginate(20)
             ->withQueryString();
 
         $exchanges = Symbol::query()
+            ->when(!$isSuper, $mineOnly)
             ->whereNotNull('exchange')
             ->distinct()
             ->orderBy('exchange')
             ->pluck('exchange');
 
-        return view('cms.companies.index', compact('companies', 'exchanges', 'search', 'exchange'));
+        return view('cms.companies.index', compact('companies', 'exchanges', 'search', 'exchange', 'ownedCodes'));
     }
 
     /**
@@ -70,29 +85,30 @@ class CompanyController extends Controller
             return back();
         }
 
-        flashing("{$symbol->code} has been added to the directory")->success()->flash();
+        DirectoryEntry::firstOrCreate([
+            'admin_id'    => auth()->guard('admins')->user()->id,
+            'symbol_code' => $symbol->code,
+        ]);
+
+        flashing("{$symbol->code} has been added to your directory")->success()->flash();
         return redirect()->route('cms.companies.show', ['code' => $symbol->code]);
     }
 
     /**
-     * Remove a symbol from the local directory. Any financial statements,
-     * analysis reports or watchlist entries already saved for it are untouched;
-     * the symbol is simply re-synced on demand (e.g. via the catalog) if it's
-     * looked up again later.
+     * Remove a symbol from the current admin's own directory. Non-destructive:
+     * the shared master `symbols` row, its financial statements, analysis reports,
+     * other admins' directory entries and watchlist entries are all untouched.
      */
     public function destroy(string $code)
     {
-        $symbol = Symbol::where('code', strtoupper($code))->first();
+        $code = strtoupper($code);
 
-        if (!$symbol) {
-            flashing('No such symbol in the directory')->error()->flash();
-            return redirect()->route('cms.companies.index');
-        }
+        DirectoryEntry::where('admin_id', auth()->guard('admins')->user()->id)
+            ->where('symbol_code', $code)
+            ->delete();
 
-        $symbol->delete();
-
-        flashing("{$symbol->code} removed from the directory")->success()->flash();
-        return redirect()->route('cms.companies.index');
+        flashing("{$code} removed from your directory")->success()->flash();
+        return back();
     }
 
     /**
@@ -119,6 +135,10 @@ class CompanyController extends Controller
             ->where('symbol_code', $symbol->code)
             ->exists();
 
+        $inDirectory = DirectoryEntry::where('admin_id', auth()->guard('admins')->user()->id)
+            ->where('symbol_code', $symbol->code)
+            ->exists();
+
         $valuation = $this->valuation($this->symbols->getEstimatedPrice($symbol->code), $latestQuote);
         $valuationRatios = $this->valuationRatios($this->symbols->getFinancialIndicators($symbol->code));
         // P/B for the headline card now comes straight from the API (fresh, and
@@ -127,7 +147,7 @@ class CompanyController extends Controller
 
         return view('cms.companies.show', compact(
             'symbol', 'profile', 'fundamentals', 'latestQuote', 'statements', 'inWatchlist',
-            'priceToBook', 'valuation', 'valuationRatios'
+            'inDirectory', 'priceToBook', 'valuation', 'valuationRatios'
         ));
     }
 

@@ -22,7 +22,20 @@
                         <small class="text-muted">No recent quote</small>
                     @endif
                 </div>
-                <div>
+                <div class="d-flex" style="gap:.5rem">
+                    @if($inDirectory)
+                        <form action="{{ route('cms.companies.destroy', ['code' => $symbol->code]) }}" method="POST"
+                              onsubmit="return confirm('Remove {{ $symbol->code }} from your directory?')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-secondary"><i class="fas fa-check"></i> In directory</button>
+                        </form>
+                    @else
+                        <form action="{{ route('cms.companies.store') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="symbol" value="{{ $symbol->code }}">
+                            <button class="btn btn-primary"><i class="fas fa-plus"></i> Add to directory</button>
+                        </form>
+                    @endif
                     @if($inWatchlist)
                         <form action="{{ route('cms.watchlist.destroy', ['code' => $symbol->code]) }}" method="POST">
                             @csrf @method('DELETE')

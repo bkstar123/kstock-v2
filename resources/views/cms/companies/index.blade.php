@@ -85,19 +85,21 @@
                                         <i class="far fa-star"></i>
                                     </button>
                                 </form>
+                                @if(in_array($company->code, $ownedCodes))
                                 <form action="{{ route('cms.companies.destroy', ['code' => $company->code]) }}" method="POST" style="display:inline"
-                                      onsubmit="return confirm('Remove {{ $company->code }} from the directory?')">
+                                      onsubmit="return confirm('Remove {{ $company->code }} from your directory?')">
                                     @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-danger" type="submit" title="Remove from directory">
+                                    <button class="btn btn-sm btn-danger" type="submit" title="Remove from my directory">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
+                                @endif
                             </td>
                         </tr>
                         @empty
                         <tr>
                             <td colspan="5" class="text-center text-muted p-4">
-                                No symbols yet. Add one on the left, or run <code>php artisan symbols:sync FPT VNM HPG</code>.
+                                Your directory is empty. Add a symbol on the left to start building your own list.
                             </td>
                         </tr>
                         @endforelse
