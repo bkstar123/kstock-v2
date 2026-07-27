@@ -16,7 +16,13 @@ return new class extends Migration
             $table->timestamps();
 
             // Doubles as the "my library" lookup index (admin_id leftmost).
-            $table->unique(['admin_id', 'financial_statement_id']);
+            //
+            // The name is EXPLICIT because Laravel's generated one —
+            // financial_statement_entries_admin_id_financial_statement_id_unique —
+            // is 66 characters, and MySQL caps identifiers at 64 (error 1059).
+            // SQLite has no such limit, so this only shows up on MySQL. Keep any
+            // future index on this table under 64 characters too.
+            $table->unique(['admin_id', 'financial_statement_id'], 'fs_entries_admin_statement_unique');
             $table->foreign('admin_id')->references('id')->on('admins')->cascadeOnDelete();
             $table->foreign('financial_statement_id')->references('id')
                   ->on('financial_statements')->cascadeOnDelete();
