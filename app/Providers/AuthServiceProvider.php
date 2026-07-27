@@ -30,12 +30,25 @@ class AuthServiceProvider extends ServiceProvider
             return $user->hasRole(Role::SUPERADMINS);
         });
 
+        // `financial_statements` rows are SHARED between admins (one row per
+        // symbol/year/quarter); ownership lives in the `financial_statement_entries`
+        // pivot, never on the row. Sharing is a storage optimisation, not a
+        // visibility change — an admin still only sees the periods they pulled.
         Gate::define('financial.statements.destroy', function ($user, $financial_statement) {
-            return $user->hasRole(Role::SUPERADMINS) || $user->id == $financial_statement->admin_id;
+            return $user->hasRole(Role::SUPERADMINS) || $financial_statement->isHeldBy($user->id);
         });
 
         Gate::define('financial.statements.show', function ($user, $financial_statement) {
-            return $user->hasRole(Role::SUPERADMINS) || $user->id == $financial_statement->admin_id;
+            return $user->hasRole(Role::SUPERADMINS) || $financial_statement->isHeldBy($user->id);
+        });
+
+        // Who last refreshed a shared statement is metadata about another admin's
+        // activity, so only superadmins see the identity. Everyone still sees WHEN it
+        // was refreshed — that is not optional: the content is a rolling window
+        // snapshot, and any holder's re-pull rewrites what every other holder reads,
+        // so the timestamp is how you tell your numbers moved under you.
+        Gate::define('financial.statements.viewPuller', function ($user) {
+            return $user->hasRole(Role::SUPERADMINS);
         });
 
         Gate::define('settings.index', function ($user) {

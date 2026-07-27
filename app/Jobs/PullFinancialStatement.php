@@ -7,14 +7,16 @@
  */
 namespace App\Jobs;
 
-use Exception;
+use RuntimeException;
 use Throwable;
 use App\Events\JobFailing;
 use Illuminate\Bus\Queueable;
+use App\Models\FinancialStatement;
 use App\Models\IncomeStatement;
 use App\Models\BalanceStatement;
 use App\Models\CashFlowStatement;
 use App\Services\Contracts\Symbols;
+use App\Services\StatementLibrary;
 use Illuminate\Queue\SerializesModels;
 use App\Jobs\AnalyzeFinancialStatement;
 use Illuminate\Queue\InteractsWithQueue;
@@ -70,39 +72,94 @@ class PullFinancialStatement implements ShouldQueue
      *
      * @return void
      */
+    /**
+     * One attempt only.
+     *
+     * The job makes 3-4 UNCACHED upstream HTTP calls; retrying would re-fetch all of
+     * them. The real protection against a double run is that the children are written
+     * with updateOrCreate against a unique(financial_statement_id) — this is defence
+     * in depth.
+     *
+     * @var int
+     */
+    public $tries = 1;
+
+    /**
+     * Must stay BELOW the connection's retry_after (config/queue.php), or the queue
+     * reserves the job a second time while the first copy is still fetching and runs
+     * it twice. That is how duplicate child rows were created in the first place.
+     *
+     * @var int
+     */
+    public $timeout = 540;
+
+    /**
+     * Execute the job.
+     *
+     * @return void
+     */
     public function handle()
     {
         $symbols = resolve(Symbols::class);
-        $balanceStatement = $symbols->getFullFinancialStatement($this->symbol, 1, $this->year, $this->quarter, (int) config('settings.limits', 5) + 5);
-        if (!empty($balanceStatement) && $balanceStatement != 'null' && $this->validateStatement($balanceStatement)) {
-            BalanceStatement::create([
-                'content' => $balanceStatement,
-                'financial_statement_id' => $this->financialStatementID
-            ]);
+        $limit = (int) config('settings.limits', 5) + 5;
+        $written = 0;
+
+        // updateOrCreate, not create: statements are shared, so a re-pull REFRESHES
+        // the row in place rather than appending a second child. The content is a
+        // window snapshot ending at the requested period, so re-pulling months later
+        // legitimately yields restated data — and the unique index on
+        // financial_statement_id makes this the only possible shape.
+        $balanceStatement = $symbols->getFullFinancialStatement($this->symbol, 1, $this->year, $this->quarter, $limit);
+        if ($this->usable($balanceStatement)) {
+            BalanceStatement::updateOrCreate(
+                ['financial_statement_id' => $this->financialStatementID],
+                ['content' => $balanceStatement]
+            );
+            $written++;
         }
-        $incomeStatement = $symbols->getFullFinancialStatement($this->symbol, 2, $this->year, $this->quarter, (int) config('settings.limits', 5) + 5);
-        if (!empty($incomeStatement) && $incomeStatement != 'null' && $this->validateStatement($incomeStatement)) {
-            IncomeStatement::create([
-                'content' => $incomeStatement,
-                'financial_statement_id' => $this->financialStatementID
-            ]);
+
+        $incomeStatement = $symbols->getFullFinancialStatement($this->symbol, 2, $this->year, $this->quarter, $limit);
+        if ($this->usable($incomeStatement)) {
+            IncomeStatement::updateOrCreate(
+                ['financial_statement_id' => $this->financialStatementID],
+                ['content' => $incomeStatement]
+            );
+            $written++;
         }
-        $cashFlowStatement = $symbols->getFullFinancialStatement($this->symbol, 3, $this->year, $this->quarter, (int) config('settings.limits', 5) + 5);
-        if (empty($cashFlowStatement) || $cashFlowStatement == 'null' || !$this->validateStatement($cashFlowStatement)) {
-            $cashFlowStatement = $symbols->getFullFinancialStatement($this->symbol, 4, $this->year, $this->quarter, (int) config('settings.limits', 5) + 5);
+
+        $cashFlowStatementType = '';
+        $cashFlowStatement = $symbols->getFullFinancialStatement($this->symbol, 3, $this->year, $this->quarter, $limit);
+        if ($this->usable($cashFlowStatement)) {
+            $cashFlowStatementType = 'direct';
         } else {
-            $cashFlowStatementType = "direct";
+            $cashFlowStatement = $symbols->getFullFinancialStatement($this->symbol, 4, $this->year, $this->quarter, $limit);
+            $cashFlowStatementType = $this->usable($cashFlowStatement) ? 'indirect' : '';
         }
-        if (!empty($cashFlowStatement) && $cashFlowStatement != 'null' && $this->validateStatement($cashFlowStatement)) {
-            $cashFlowStatementType = $cashFlowStatementType ?? 'indirect';
-            CashFlowStatement::create([
-                'content' => $cashFlowStatement,
-                'financial_statement_id' => $this->financialStatementID
-            ]);
-        } else {
-            $cashFlowStatementType = '';
+        if ($cashFlowStatementType !== '') {
+            CashFlowStatement::updateOrCreate(
+                ['financial_statement_id' => $this->financialStatementID],
+                ['content' => $cashFlowStatement]
+            );
+            $written++;
         }
-        AnalyzeFinancialStatement::dispatch($this->financialStatementID, $this->user, $cashFlowStatementType); // Temporary dispatch here
+
+        if ($written === 0) {
+            // Nothing usable came back. The old code left a childless parent row
+            // behind forever on every failure; drop it instead.
+            $this->discardIfEmpty();
+            throw new RuntimeException(
+                "No usable financial statement data for {$this->symbol} {$this->year}Q{$this->quarter}"
+            );
+        }
+
+        // "Last refreshed at", now that a re-pull overwrites in place. Bumped here
+        // rather than in the controller so it means refreshed, not requested.
+        FinancialStatement::whereKey($this->financialStatementID)->update(['updated_at' => now()]);
+
+        // Was unconditional: analysis used to fire even when zero statements were
+        // written, burning a getFundamentals call and running every calculator
+        // against null relations.
+        AnalyzeFinancialStatement::dispatch($this->financialStatementID, $this->user, $cashFlowStatementType);
         PullFinancialStatementCompleted::dispatch($this->user);
     }
 
@@ -118,9 +175,46 @@ class PullFinancialStatement implements ShouldQueue
      */
     public function failed(Throwable $exception)
     {
+        $this->discardIfEmpty();
         JobFailing::dispatch($this->user, $exception->getMessage());
     }
-    
+
+    /**
+     * Is this payload present and actually the period we asked for?
+     *
+     * @param  string|false|null  $content
+     */
+    protected function usable($content): bool
+    {
+        return !empty($content) && $content !== 'null' && $this->validateStatement($content);
+    }
+
+    /**
+     * Drop a statement that carries no data at all.
+     *
+     * The "no data at all" test is what makes this correct under refresh-in-place:
+     *   - brand-new row, pull produced nothing  -> zero children -> purged. Right.
+     *   - existing row, REFRESH produced nothing -> updateOrCreate never ran, so the
+     *     old children are untouched -> not purged. Right: a failed refresh must
+     *     never destroy data another admin is still using.
+     */
+    protected function discardIfEmpty(): void
+    {
+        try {
+            $id = $this->financialStatementID;
+            $hasData = BalanceStatement::where('financial_statement_id', $id)->exists()
+                || IncomeStatement::where('financial_statement_id', $id)->exists()
+                || CashFlowStatement::where('financial_statement_id', $id)->exists();
+
+            if (!$hasData) {
+                resolve(StatementLibrary::class)->purge($id);
+            }
+        } catch (Throwable $e) {
+            // Cleanup must never mask the original failure.
+            report($e);
+        }
+    }
+
     /**
      * Validate whether or not the pulled contents are of the desired financial statement
      *
@@ -129,13 +223,16 @@ class PullFinancialStatement implements ShouldQueue
      */
     protected function validateStatement($content)
     {
-        $firstItem = array_first(json_decode($content, true));
+        // Throwable, not Exception: an empty payload makes array_first() return null,
+        // and Arr::where(null, ...) raises a TypeError — an Error, which a narrower
+        // catch would let escape.
         try {
+            $firstItem = array_first(json_decode($content, true));
             $data = \Arr::where($firstItem['values'], function ($value) {
                 return $value['year'] == $this->year && $value['quarter'] == $this->quarter;
             });
             return !empty($data);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return false;
         }
     }

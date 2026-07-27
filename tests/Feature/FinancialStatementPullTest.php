@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\PullFinancialStatement;
+use App\Models\FinancialStatement;
 use Bkstar123\BksCMS\AdminPanel\Admin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -44,7 +45,12 @@ class FinancialStatementPullTest extends TestCase
             'symbol'   => 'FPT',
             'year'     => 2022,
             'quarter'  => 1,
-            'admin_id' => $admin->id,
+        ]);
+        // Ownership is moving to the pivot; the pull must record a hold there too.
+        $statement = FinancialStatement::where(['symbol' => 'FPT', 'year' => 2022, 'quarter' => 1])->firstOrFail();
+        $this->assertDatabaseHas('financial_statement_entries', [
+            'admin_id'               => $admin->id,
+            'financial_statement_id' => $statement->id,
         ]);
         Queue::assertPushed(PullFinancialStatement::class);
     }

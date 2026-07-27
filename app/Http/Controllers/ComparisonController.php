@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FinancialStatement;
 use App\Services\Contracts\Symbols as SymbolsInterface;
+use App\Services\StatementLibrary;
 use App\Services\SymbolCatalog;
 use Illuminate\Http\Request;
 
@@ -22,31 +23,25 @@ class ComparisonController extends Controller
      */
     protected $catalog;
 
-    public function __construct(SymbolsInterface $symbols, SymbolCatalog $catalog)
+    /**
+     * @var StatementLibrary
+     */
+    protected $library;
+
+    public function __construct(SymbolsInterface $symbols, SymbolCatalog $catalog, StatementLibrary $library)
     {
         $this->symbols = $symbols;
         $this->catalog = $catalog;
+        $this->library = $library;
     }
 
     public function index(Request $request)
     {
-        // Kỳ gần nhất của mỗi symbol có phân tích -> danh sách chọn được.
-        $available = FinancialStatement::with('analysis_report')
-            ->get()
-            ->filter(fn ($fs) => !empty($fs->analysis_report))
-            ->sortByDesc(fn ($fs) => sprintf('%04d%d', $fs->year, $fs->quarter))
-            ->groupBy('symbol')
-            ->map(function ($statements) {
-                $fs = $statements->first(); // mới nhất (đã sort desc)
-                return [
-                    'code'   => $fs->symbol,
-                    'type'   => institutionType($fs->analysis_report),
-                    'period' => $fs->quarter ? "Q{$fs->quarter} {$fs->year}" : (string) $fs->year,
-                    'fs'     => $fs,
-                ];
-            })
-            ->sortKeys()
-            ->values();
+        // Kỳ gần nhất của mỗi symbol có phân tích, GIỚI HẠN theo thư viện của người
+        // đang xem (superadmin thấy tất cả). Trước đây query này đọc toàn bộ bảng
+        // không lọc admin_id — rò rỉ báo cáo của admin khác, trái với gate
+        // financial.statements.show.
+        $available = $this->library->comparable(auth()->guard('admins')->user());
 
         $requested = (array) $request->input('symbols', []);
         $selected = $available->filter(fn ($row) => in_array($row['code'], $requested, true))->values();

@@ -30,7 +30,7 @@
                             <th>Symbol</th>
                             <th>Year</th>
                             <th>Quarter</th>
-                            <th>Pulled by</th>
+                            <th>Last refreshed</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -52,7 +52,11 @@
                                 {{ !empty($financial_statement->quarter) ? $financial_statement->quarter : 'Yearly' }}
                             </td>
                             <td>
-                                {{ $financial_statement->admin->email }}
+                                {{-- Only superadmins see WHO refreshed it; everyone sees WHEN. --}}
+                                @can('financial.statements.viewPuller')
+                                    {{ optional($financial_statement->lastPulledBy)->email ?? '—' }}<br>
+                                @endcan
+                                <small class="text-muted">{{ optional($financial_statement->updated_at)->diffForHumans() ?? '—' }}</small>
                             </td>
                             <td>
                                 @can('financial.statements.destroy', $financial_statement)

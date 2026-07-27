@@ -35,6 +35,21 @@ class Symbol extends Model
     }
 
     /**
+     * Restrict to the symbols in the given admin's personal directory.
+     *
+     * `symbols` is a shared master table with no owner column, so per-admin
+     * scoping always goes through the `directory_entries` pivot. The directory
+     * is strictly personal — superadmins included; see CompanyController::index.
+     */
+    public function scopeInDirectoryOf(Builder $query, $adminId): Builder
+    {
+        return $query->whereIn(
+            'code',
+            DirectoryEntry::where('admin_id', $adminId)->select('symbol_code')
+        );
+    }
+
+    /**
      * Portable search (code or name) that works on both SQLite and MySQL.
      * Intentionally does NOT use the MySqlSearch fulltext trait.
      */

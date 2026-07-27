@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\DirectoryEntry;
+use App\Models\FinancialStatement;
 use App\Models\Symbol;
+use App\Models\Watchlist;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
 use Bkstar123\BksCMS\AdminPanel\Role;
@@ -80,13 +82,76 @@ class CompanyDirectoryTest extends TestCase
             ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
     }
 
-    public function test_superadmin_sees_the_whole_catalog()
+    public function test_superadmin_sees_only_their_own_directory()
     {
-        // A symbol in nobody's directory is still visible to a superadmin.
+        // The directory is a personal working list, not an administrative view of
+        // the catalog: a symbol in nobody's directory is invisible even to a
+        // superadmin. (Financial statements deliberately keep superadmin-sees-all.)
         Symbol::create(['code' => 'HPG', 'name' => 'CTCP Tap doan Hoa Phat', 'exchange' => 'HSX']);
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
 
-        $this->actingAs($this->superadmin(), 'admins')->get('/cms/companies')
-            ->assertStatus(200)->assertSee('HPG');
+        $super = $this->superadmin();
+        DirectoryEntry::create(['admin_id' => $super->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($super, 'admins')->get('/cms/companies')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('HPG');
+    }
+
+    public function test_superadmin_does_not_see_another_admins_directory()
+    {
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        Symbol::create(['code' => 'VNM', 'name' => 'CTCP Sua Viet Nam', 'exchange' => 'HSX']);
+
+        $super = $this->superadmin();
+        $other = $this->admin();
+        DirectoryEntry::create(['admin_id' => $super->id, 'symbol_code' => 'FPT']);
+        DirectoryEntry::create(['admin_id' => $other->id, 'symbol_code' => 'VNM']);
+
+        $this->actingAs($super, 'admins')->get('/cms/companies')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
+    }
+
+    public function test_exchange_facet_is_scoped_to_the_actors_directory()
+    {
+        // The dropdown must not offer exchanges the admin has no symbols on.
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        Symbol::create(['code' => 'SHS', 'name' => 'CTCP CK Sai Gon Ha Noi', 'exchange' => 'HNX']);
+
+        $admin = $this->admin();
+        DirectoryEntry::create(['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($admin, 'admins')->get('/cms/companies')
+            ->assertStatus(200)->assertSee('HSX')->assertDontSee('HNX');
+    }
+
+    public function test_directory_renders_a_bootstrap_modal_not_a_js_confirm()
+    {
+        $symbol = Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($a, 'admins')->get('/cms/companies')
+            ->assertStatus(200)
+            ->assertSee('removing-modal-' . $symbol->id, false)
+            ->assertSee('deleting-form-' . $symbol->id, false)
+            ->assertSee('modal-header bg-danger', false)   // inherits the modern.css theme rules
+            ->assertDontSee('return confirm(', false);
+    }
+
+    public function test_company_page_renders_a_bootstrap_modal_not_a_js_confirm()
+    {
+        $a = $this->admin();
+        // show() upserts the master row via remember(); add the directory entry so
+        // the "In directory" button (and therefore the modal) renders.
+        $this->actingAs($a, 'admins')->get('/cms/companies/FPT');
+        $symbol = Symbol::where('code', 'FPT')->firstOrFail();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($a, 'admins')->get('/cms/companies/FPT')
+            ->assertStatus(200)
+            ->assertSee('removing-modal-' . $symbol->id, false)
+            ->assertSee('deleting-form-' . $symbol->id, false)
+            ->assertDontSee('return confirm(', false);
     }
 
     public function test_store_adds_a_known_symbol_to_the_actors_directory()
@@ -114,18 +179,99 @@ class CompanyDirectoryTest extends TestCase
             ->assertRedirect('/cms/companies');
 
         // Only A's entry is gone; B's entry and the shared master row survive.
+        // The last assertion is the reference-counting requirement itself: the
+        // master row is spared *because* B still references it. Do not "simplify"
+        // it away — without it, nothing pins that behaviour.
         $this->assertDatabaseMissing('directory_entries', ['admin_id' => $a->id, 'symbol_code' => 'FPT']);
         $this->assertDatabaseHas('directory_entries', ['admin_id' => $b->id, 'symbol_code' => 'FPT']);
         $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
     }
 
-    public function test_destroy_is_a_no_op_for_an_unentered_symbol()
+    public function test_destroy_purges_the_master_row_when_nothing_else_references_it()
+    {
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($a, 'admins')->from('/cms/companies')
+            ->delete('/cms/companies/FPT')
+            ->assertRedirect('/cms/companies');
+
+        $this->assertDatabaseCount('directory_entries', 0);
+        $this->assertDatabaseMissing('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_destroy_keeps_the_actors_watchlist_entry_and_the_master_row()
+    {
+        // Removing from the directory touches ONLY the directory entry.
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        Watchlist::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($a, 'admins')->from('/cms/companies')->delete('/cms/companies/FPT');
+
+        $this->assertDatabaseMissing('directory_entries', ['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('watchlists', ['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_destroy_keeps_the_actors_financial_statements_and_the_master_row()
+    {
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        FinancialStatement::create([
+            'symbol' => 'FPT', 'year' => 2024, 'quarter' => 0, 'last_pulled_by_admin_id' => $a->id,
+        ]);
+
+        $this->actingAs($a, 'admins')->from('/cms/companies')->delete('/cms/companies/FPT');
+
+        $this->assertDatabaseMissing('directory_entries', ['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('financial_statements', ['symbol' => 'FPT']);
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_destroy_from_the_company_page_redirects_to_the_directory()
+    {
+        // Guards the resurrection vector: back() would re-enter show(), whose
+        // remember() call would re-create the row destroy() just purged.
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $a = $this->admin();
+        DirectoryEntry::create(['admin_id' => $a->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($a, 'admins')
+            ->from(route('cms.companies.show', ['code' => 'FPT']))
+            ->delete('/cms/companies/FPT')
+            ->assertRedirect(route('cms.companies.index'));
+
+        $this->assertDatabaseMissing('symbols', ['code' => 'FPT']);
+    }
+
+    public function test_destroy_by_a_non_owner_does_not_purge_the_master_row()
+    {
+        // The security fix. FPT is an orphan master row with zero references — the
+        // maximally hostile case: without the $deleted guard in destroy(),
+        // release() finds no references and purges a row the caller never owned.
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $stranger = $this->admin();
+
+        $this->actingAs($stranger, 'admins')->from('/cms/companies')
+            ->delete('/cms/companies/FPT')
+            ->assertRedirect('/cms/companies');
+
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
+        $this->assertDatabaseCount('directory_entries', 0);
+    }
+
+    public function test_destroy_is_a_no_op_for_an_unknown_symbol()
     {
         $this->actingAs($this->admin(), 'admins')->from('/cms/companies')
             ->delete('/cms/companies/ZZZ')
             ->assertRedirect('/cms/companies');
 
         $this->assertDatabaseCount('directory_entries', 0);
+        $this->assertDatabaseCount('symbols', 0);
     }
 
     public function test_guest_cannot_destroy_an_entry()
@@ -137,6 +283,7 @@ class CompanyDirectoryTest extends TestCase
         $this->delete('/cms/companies/FPT')->assertRedirect();
 
         $this->assertDatabaseHas('directory_entries', ['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
     }
 
     public function test_store_rejects_an_unknown_symbol()

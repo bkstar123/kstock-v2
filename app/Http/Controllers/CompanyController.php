@@ -12,7 +12,6 @@ use App\Models\Symbol;
 use App\Models\Watchlist;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use App\Services\SymbolCatalog;
-use Bkstar123\BksCMS\AdminPanel\Role;
 use Illuminate\Http\Request;
 
 class CompanyController extends Controller
@@ -34,39 +33,42 @@ class CompanyController extends Controller
     }
 
     /**
-     * Searchable symbol directory. Personalised per admin: a regular admin sees
-     * only the symbols in their own directory; a superadmin sees the whole master
-     * catalog (mirrors the financial-statement listing rule).
+     * Searchable symbol directory. Strictly personalised: every admin — superadmin
+     * included — sees only the symbols in their own `directory_entries`.
+     *
+     * This is a DELIBERATE departure from the financial-statement listing, which
+     * still lets a superadmin see everything (AuthServiceProvider gates and
+     * SymbolController::listFinancialStatements). The directory is a personal
+     * working list, not an administrative view of the shared catalog — so there is
+     * no superadmin bypass here, and none should be added.
+     *
+     * Because the listing always filters through `directory_entries`, an orphaned
+     * `symbols` row (one nobody references any more) is simply unreachable from
+     * this page. That is what makes SymbolCatalog::release() housekeeping rather
+     * than a correctness requirement.
      */
     public function index(Request $request)
     {
-        $search = $request->input('search');
+        $search   = $request->input('search');
         $exchange = $request->input('exchange');
-
-        $me = auth()->guard('admins')->user();
-        $isSuper = $me->hasRole(Role::SUPERADMINS);
-        // Codes the current admin has added to their own directory. Drives both the
-        // regular-admin filter and (for everyone) which rows show a Remove button.
-        $ownedCodes = DirectoryEntry::where('admin_id', $me->id)->pluck('symbol_code')->all();
-
-        $mineOnly = fn ($q) => $q->whereIn('code',
-            DirectoryEntry::where('admin_id', $me->id)->select('symbol_code'));
+        $meId     = auth()->guard('admins')->user()->id;
 
         $companies = Symbol::search($search)
+            ->inDirectoryOf($meId)
             ->when($exchange, fn ($q) => $q->where('exchange', $exchange))
-            ->when(!$isSuper, $mineOnly)
             ->orderBy('code')
             ->paginate(20)
             ->withQueryString();
 
-        $exchanges = Symbol::query()
-            ->when(!$isSuper, $mineOnly)
+        // The facet list must be scoped identically, or the dropdown offers
+        // exchanges the admin has no symbols on.
+        $exchanges = Symbol::inDirectoryOf($meId)
             ->whereNotNull('exchange')
             ->distinct()
             ->orderBy('exchange')
             ->pluck('exchange');
 
-        return view('cms.companies.index', compact('companies', 'exchanges', 'search', 'exchange', 'ownedCodes'));
+        return view('cms.companies.index', compact('companies', 'exchanges', 'search', 'exchange'));
     }
 
     /**
@@ -95,20 +97,41 @@ class CompanyController extends Controller
     }
 
     /**
-     * Remove a symbol from the current admin's own directory. Non-destructive:
-     * the shared master `symbols` row, its financial statements, analysis reports,
-     * other admins' directory entries and watchlist entries are all untouched.
+     * Remove a symbol from the current admin's own directory.
+     *
+     * Scope is strictly the caller's own directory entry: their watchlist entry and
+     * their financial statements for the ticker are deliberately left alone, as are
+     * every other admin's rows. The shared master `symbols` row is then reference-
+     * counted and purged only if nothing anywhere still points at it.
      */
     public function destroy(string $code)
     {
-        $code = strtoupper($code);
+        $code = strtoupper(trim($code));
 
-        DirectoryEntry::where('admin_id', auth()->guard('admins')->user()->id)
-            ->where('symbol_code', $code)
+        // The $deleted guard is LOAD-BEARING FOR SECURITY, not just for the flash
+        // message. This route carries no `can:` middleware (see routes/web.php), so
+        // without it any authenticated admin could hit DELETE /cms/companies/{code}
+        // for a ticker they never added and trigger the catalog purge for it.
+        $deleted = DirectoryEntry::where('admin_id', auth()->guard('admins')->user()->id)
+            ->whereRaw('UPPER(symbol_code) = ?', [$code])
             ->delete();
 
-        flashing("{$code} removed from your directory")->success()->flash();
-        return back();
+        if (!$deleted) {
+            flashing("{$code} is not in your directory")->error()->flash();
+            return redirect()->route('cms.companies.index');
+        }
+
+        $purged = $this->catalog->release($code);
+
+        flashing($purged
+            ? "{$code} has been removed from your directory and purged from the catalog"
+            : "{$code} has been removed from your directory (it is still referenced elsewhere, so the catalog entry was kept)"
+        )->success()->flash();
+
+        // Never back(): the company profile page posts this same DELETE, and going
+        // back there re-enters show(), whose remember() call would immediately
+        // re-create the row we just purged from the 12h-cached API payload.
+        return redirect()->route('cms.companies.index');
     }
 
     /**
@@ -127,8 +150,14 @@ class CompanyController extends Controller
         $fundamentals = $this->symbols->getFundamentalsData($symbol->code);
         $latestQuote  = $this->symbols->getLatestQuote($symbol->code);
 
+        // Scoped to the viewer's own library (superadmin sees all), because every row
+        // links to cms.financial.statements.show, which is gated on holding — an
+        // unscoped list renders links that 403. withOnly() because this table shows
+        // only year/quarter/puller and must not drag ~330 KB of blobs per row.
         $statements = FinancialStatement::where('symbol', $symbol->code)
-            ->orderByDesc('year')->orderByDesc('quarter')
+            ->visibleTo(auth()->guard('admins')->user())
+            ->withOnly('lastPulledBy')
+            ->orderByDesc('year')->orderByDesc('quarter')->orderByDesc('id')
             ->get();
 
         $inWatchlist = Watchlist::where('admin_id', auth()->guard('admins')->user()->id)

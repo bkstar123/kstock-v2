@@ -4,11 +4,17 @@
  *
  * The external API exposes no full-universe endpoint, so we refresh the tickers we
  * already know about: any codes passed as arguments, every symbol that has a
- * pulled FinancialStatement, and every watchlisted symbol. Each is resolved
- * via SymbolCatalog (GET /symbols/{code}).
+ * pulled FinancialStatement, every watchlisted symbol, and every symbol in any
+ * admin's directory. Each is resolved via SymbolCatalog (GET /symbols/{code}).
+ *
+ * That set is deliberately the same three tables SymbolCatalog::isReferenced()
+ * checks, so this command can never resurrect a row that release() legitimately
+ * purged: unreferenced means absent from all three, hence absent from the union.
+ * The only way back is the explicit {codes} argument — a deliberate operator act.
  */
 namespace App\Console\Commands;
 
+use App\Models\DirectoryEntry;
 use App\Models\FinancialStatement;
 use App\Models\Watchlist;
 use App\Services\SymbolCatalog;
@@ -25,6 +31,7 @@ class SyncSymbols extends Command
         $codes = collect($this->argument('codes'))
             ->merge(FinancialStatement::query()->distinct()->pluck('symbol'))
             ->merge(Watchlist::query()->distinct()->pluck('symbol_code'))
+            ->merge(DirectoryEntry::query()->distinct()->pluck('symbol_code'))
             ->map(fn ($c) => strtoupper(trim((string) $c)))
             ->filter()
             ->unique()

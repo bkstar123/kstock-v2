@@ -85,15 +85,17 @@
                                         <i class="far fa-star"></i>
                                     </button>
                                 </form>
-                                @if(in_array($company->code, $ownedCodes))
-                                <form action="{{ route('cms.companies.destroy', ['code' => $company->code]) }}" method="POST" style="display:inline"
-                                      onsubmit="return confirm('Remove {{ $company->code }} from your directory?')">
+                                {{-- Every listed row is by definition in the viewer's own
+                                     directory (index() always filters through
+                                     directory_entries), so Remove is unconditional. --}}
+                                <button type="button" class="btn btn-sm btn-danger" title="Remove from my directory"
+                                        onclick="event.preventDefault();$('#removing-modal-{{ $company->id }}').modal('show')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <form id="deleting-form-{{ $company->id }}" style="display:none"
+                                      action="{{ route('cms.companies.destroy', ['code' => $company->code]) }}" method="POST">
                                     @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-danger" type="submit" title="Remove from my directory">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
                                 </form>
-                                @endif
                             </td>
                         </tr>
                         @empty
@@ -110,4 +112,12 @@
         {{ $companies->links() }}
     </div>
 </div>
+
+{{-- Delete-confirmation modals live OUTSIDE the .card on purpose: a transformed or
+     overflow-clipped ancestor becomes the containing block for their position:fixed.
+     modern.css already neutralises .card's transform while a modal is open, but not
+     .card-body.table-responsive's overflow-x. Rendering them here sidesteps both. --}}
+@foreach($companies as $company)
+    @include('cms.companies.partials.remove-modal', ['symbol' => $company])
+@endforeach
 @endsection

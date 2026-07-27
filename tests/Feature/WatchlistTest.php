@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\DirectoryEntry;
+use App\Models\Symbol;
 use App\Models\Watchlist;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
@@ -88,6 +90,23 @@ class WatchlistTest extends TestCase
             ->assertRedirect('/cms/watchlist');
 
         $this->assertDatabaseCount('watchlists', 0);
+    }
+
+    public function test_watchlist_still_shows_the_name_after_the_directory_entry_is_removed()
+    {
+        // End-to-end proof that removing from the directory is scoped: the shared
+        // master row survives *because* the watchlist still references it, so the
+        // Name cell stays populated instead of degrading to optional()'s blank.
+        Symbol::create(['code' => 'FPT', 'name' => 'CTCP FPT', 'exchange' => 'HSX']);
+        $admin = $this->admin();
+        DirectoryEntry::create(['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
+        Watchlist::create(['admin_id' => $admin->id, 'symbol_code' => 'FPT']);
+
+        $this->actingAs($admin, 'admins')->delete('/cms/companies/FPT');
+
+        $this->actingAs($admin, 'admins')->get('/cms/watchlist')
+            ->assertStatus(200)->assertSee('CTCP FPT');
+        $this->assertDatabaseHas('symbols', ['code' => 'FPT']);
     }
 
     public function test_admin_does_not_see_another_admins_watchlist()

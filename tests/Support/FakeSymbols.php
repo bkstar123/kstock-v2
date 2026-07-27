@@ -15,10 +15,40 @@ class FakeSymbols implements SymbolsInterface
         'VNM' => ['symbol' => 'VNM', 'isListing' => true, 'name' => 'CTCP Sữa Việt Nam', 'exchange' => 'HSX', 'type' => 'stock', 'industryCode' => '3570', 'icbCode' => '45102020'],
     ];
 
+    /**
+     * A minimal payload that survives PullFinancialStatement::validateStatement()
+     * (which checks the first item's `values` contains the requested year+quarter),
+     * so tests can drive the real job. Unknown tickers return the literal 'null' the
+     * upstream API sends, which drives the discard path instead.
+     *
+     * The `type` is folded into the value so a test can tell the three statement
+     * kinds apart, and `$this->pullNonce` lets a test prove a re-pull actually
+     * replaced the content rather than appending a second child row.
+     */
     public function getFullFinancialStatement(string $symbol, int $type, string $year, int $quarter, int $limit = 1)
     {
-        return json_encode([]);
+        if (!isset($this->known[strtoupper($symbol)])) {
+            return 'null';
+        }
+
+        return json_encode([[
+            'id' => '1',
+            'name' => "Item type {$type}",
+            'parentID' => -1,
+            'level' => 1,
+            'values' => [[
+                'period'  => $quarter ? "Q{$quarter} {$year}" : (string) $year,
+                'year'    => (int) $year,
+                'quarter' => (int) $quarter,
+                'value'   => $type * 100 + $this->pullNonce,
+            ]],
+        ]]);
     }
+
+    /**
+     * Bumped by a test between two pulls to make the second payload distinguishable.
+     */
+    public int $pullNonce = 0;
 
     public function getFundamentals(string $symbol)
     {

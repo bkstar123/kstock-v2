@@ -102,6 +102,9 @@ class AdminController extends Controller
                 ->success()
                 ->flash();
         } catch (Exception $e) {
+            // Log before swallowing: this catch is otherwise invisible, and admin
+            // deletion now runs app-level observers (see App\Observers\AdminSymbolObserver).
+            report($e);
             flashing("The submitted action failed to be executed due to some unknown error")
                 ->error()
                 ->flash();
@@ -126,6 +129,8 @@ class AdminController extends Controller
                 ->success()
                 ->flash();
         } catch (Exception $e) {
+            // Log before swallowing — see the note in destroy().
+            report($e);
             flashing("The submitted action failed to be executed due to some unknown error")
                 ->error()
                 ->flash();

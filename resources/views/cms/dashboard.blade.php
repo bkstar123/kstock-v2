@@ -3,23 +3,6 @@
 
 @section('content')
 @php
-    $adminId = auth()->guard('admins')->user()->id;
-    $watch = \App\Models\Watchlist::with('symbol')
-        ->where('admin_id', $adminId)->orderBy('symbol_code')->get();
-    // Các mã đã có phân tích -> so sánh được (kỳ gần nhất mỗi mã).
-    $comparable = \App\Models\FinancialStatement::with('analysis_report')->get()
-        ->filter(fn ($fs) => !empty($fs->analysis_report))
-        ->sortByDesc(fn ($fs) => sprintf('%04d%d', $fs->year, $fs->quarter))
-        ->groupBy('symbol')
-        ->map(function ($s) {
-            $fs = $s->first();
-            return [
-                'code'   => $fs->symbol,
-                'type'   => institutionType($fs->analysis_report),
-                'period' => $fs->quarter ? "Q{$fs->quarter} {$fs->year}" : (string) $fs->year,
-            ];
-        })
-        ->sortKeys()->values();
     $typeLabels = ['bank' => 'Ngân hàng', 'securities' => 'Chứng khoán', 'insurance' => 'Bảo hiểm'];
     $typeLabel = fn ($t) => $typeLabels[$t] ?? 'Phi tài chính';
     $typeClass = fn ($t) => 'ks-type-' . ($t ?: 'normal');

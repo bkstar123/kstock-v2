@@ -24,10 +24,13 @@
                 </div>
                 <div class="d-flex" style="gap:.5rem">
                     @if($inDirectory)
-                        <form action="{{ route('cms.companies.destroy', ['code' => $symbol->code]) }}" method="POST"
-                              onsubmit="return confirm('Remove {{ $symbol->code }} from your directory?')">
+                        <button type="button" class="btn btn-secondary" title="Remove from my directory"
+                                onclick="event.preventDefault();$('#removing-modal-{{ $symbol->id }}').modal('show')">
+                            <i class="fas fa-check"></i> In directory
+                        </button>
+                        <form id="deleting-form-{{ $symbol->id }}" style="display:none"
+                              action="{{ route('cms.companies.destroy', ['code' => $symbol->code]) }}" method="POST">
                             @csrf @method('DELETE')
-                            <button class="btn btn-secondary"><i class="fas fa-check"></i> In directory</button>
                         </form>
                     @else
                         <form action="{{ route('cms.companies.store') }}" method="POST">
@@ -248,13 +251,20 @@
                 </a>
                 @if($statements->count())
                 <table class="table table-hover">
-                    <thead><tr><th>Year</th><th>Quarter</th><th>Pulled by</th><th class="text-right">Action</th></tr></thead>
+                    <thead><tr><th>Year</th><th>Quarter</th><th>Last refreshed</th><th class="text-right">Action</th></tr></thead>
                     <tbody>
                         @foreach($statements as $st)
                         <tr>
                             <td>{{ $st->year }}</td>
                             <td>{{ $st->quarter == 0 ? 'Annual' : 'Q'.$st->quarter }}</td>
-                            <td>{{ optional($st->admin)->email }}</td>
+                            {{-- Only superadmins see WHO refreshed it; everyone sees WHEN. --}}
+                            <td>
+                                @can('financial.statements.viewPuller')
+                                    {{ optional($st->lastPulledBy)->email ?? '—' }}
+                                    <span class="text-muted">·</span>
+                                @endcan
+                                <span class="text-muted">{{ optional($st->updated_at)->diffForHumans() ?? '—' }}</span>
+                            </td>
                             <td class="text-right">
                                 <a href="{{ route('cms.financial.statements.show', ['financial_statement' => $st->id]) }}" class="btn btn-sm btn-primary">
                                     <i class="fas fa-eye"></i> Open analysis
@@ -271,6 +281,12 @@
         </div>
     </div>
 </div>
+
+{{-- Rendered outside every .card so no transformed/clipped ancestor can become the
+     containing block for the modal's position:fixed. --}}
+@if($inDirectory)
+    @include('cms.companies.partials.remove-modal', ['symbol' => $symbol])
+@endif
 @endsection
 
 @push('css')

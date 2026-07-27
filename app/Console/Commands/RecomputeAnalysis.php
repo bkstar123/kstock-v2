@@ -9,6 +9,7 @@ namespace App\Console\Commands;
 use App\Jobs\AnalyzeFinancialStatement;
 use App\Models\AnalysisReport;
 use App\Models\FinancialStatement;
+use App\Models\FinancialStatementEntry;
 use Bkstar123\BksCMS\AdminPanel\Admin;
 use Exception;
 use Illuminate\Console\Command;
@@ -42,17 +43,26 @@ class RecomputeAnalysis extends Command
         $ok = 0;
         $skip = 0;
         foreach ($statements as $fs) {
-            $admin = Admin::find($fs->admin_id);
+            // Báo cáo là hàm thuần của (dữ liệu BCTC, companyType, settings.limits) —
+            // $admin chỉ dùng để broadcast, mà command đã tắt broadcast ở trên. Nên
+            // bất kỳ holder nào cũng được; fallback để statement có người kéo đã bị
+            // xoá vẫn tính lại được.
+            $admin = $fs->lastPulledBy
+                ?: Admin::whereIn(
+                        'id',
+                        FinancialStatementEntry::where('financial_statement_id', $fs->id)->select('admin_id')
+                    )->first()
+                ?: Admin::query()->orderBy('id')->first();
             if (!$admin) {
-                $this->line("  <comment>✗</comment> #{$fs->id} {$fs->symbol} — không tìm thấy admin sở hữu");
+                $this->line("  <comment>✗</comment> #{$fs->id} {$fs->symbol} — không có admin nào để quy thuộc lần chạy");
                 $skip++;
                 continue;
             }
-            // Chụp lại các report cũ để xóa SAU khi tạo bản mới thành công.
-            $oldReportIds = AnalysisReport::where('financial_statement_id', $fs->id)->pluck('id')->all();
             try {
+                // Không còn phải dọn report cũ: unique(financial_statement_id) đảm bảo
+                // tối đa 1 report mỗi statement, và AnalyzeFinancialStatement ghi bằng
+                // updateOrCreate nên nó ghi đè đúng chỗ thay vì chồng thêm row.
                 AnalyzeFinancialStatement::dispatchSync($fs->id, $admin, $type);
-                AnalysisReport::whereIn('id', $oldReportIds)->delete();
                 $this->line("  <info>✓</info> {$fs->symbol} {$fs->year}Q{$fs->quarter} (#{$fs->id})");
                 $ok++;
             } catch (\Throwable $e) {

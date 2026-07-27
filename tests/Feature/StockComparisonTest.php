@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AnalysisReport;
 use App\Models\FinancialStatement;
+use App\Models\FinancialStatementEntry;
 use App\Services\Contracts\Symbols as SymbolsInterface;
 use Bkstar123\BksCMS\AdminPanel\Admin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,10 +24,13 @@ class StockComparisonTest extends TestCase
         $this->app->instance(SymbolsInterface::class, new FakeSymbols());
     }
 
+    private int $adminSeq = 0;
+
     private function admin(): Admin
     {
+        $n = ++$this->adminSeq;
         return Admin::create([
-            'name' => 'Cmp', 'username' => 'cmp', 'email' => 'cmp@example.com',
+            'name' => "Cmp{$n}", 'username' => "cmp{$n}", 'email' => "cmp{$n}@example.com",
             'password' => bcrypt('secret123'),
         ])->refresh();
     }
@@ -41,7 +45,10 @@ class StockComparisonTest extends TestCase
 
     private function makeStatement(int $adminId, string $symbol, array $items): void
     {
-        $fs = FinancialStatement::create(['symbol' => $symbol, 'admin_id' => $adminId, 'year' => 2026, 'quarter' => 1]);
+        $fs = FinancialStatement::create(['symbol' => $symbol, 'last_pulled_by_admin_id' => $adminId, 'year' => 2026, 'quarter' => 1]);
+        // Ownership is the pivot, and the picker is scoped through it — a statement
+        // with no hold is invisible to everyone.
+        FinancialStatementEntry::create(['admin_id' => $adminId, 'financial_statement_id' => $fs->id]);
         AnalysisReport::create(['financial_statement_id' => $fs->id, 'content' => json_encode($items)]);
     }
 
@@ -105,5 +112,50 @@ class StockComparisonTest extends TestCase
         // ZZZ không có báo cáo -> bị loại, chỉ FPT được so sánh, không lỗi.
         $this->actingAs($admin, 'admins')->get('/cms/compare?symbols[]=FPT&symbols[]=ZZZ')
             ->assertStatus(200)->assertSee('FPT');
+    }
+
+    public function test_the_picker_does_not_leak_another_admins_reports()
+    {
+        // Compare and the dashboard used to read every admin's statements with no
+        // admin_id filter, contradicting the financial.statements.show gate.
+        $mine = $this->admin();
+        $theirs = $this->admin();
+        $this->makeStatement($mine->id, 'FPT', [$this->item('ROE', 'Khả năng sinh lời', '%', 25.0)]);
+        $this->makeStatement($theirs->id, 'VNM', [$this->item('ROE', 'Khả năng sinh lời', '%', 30.0)]);
+
+        $this->actingAs($mine, 'admins')->get('/cms/compare')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
+    }
+
+    public function test_the_dashboard_picker_does_not_leak_another_admins_reports()
+    {
+        $mine = $this->admin();
+        $theirs = $this->admin();
+        $this->makeStatement($mine->id, 'FPT', [$this->item('ROE', 'Khả năng sinh lời', '%', 25.0)]);
+        $this->makeStatement($theirs->id, 'VNM', [$this->item('ROE', 'Khả năng sinh lời', '%', 30.0)]);
+
+        $this->actingAs($mine, 'admins')->get('/cms/dashboard')
+            ->assertStatus(200)->assertSee('FPT')->assertDontSee('VNM');
+    }
+
+    public function test_the_picker_takes_the_newest_period_not_the_oldest_row()
+    {
+        // Q1 is inserted FIRST (lower id). The old picker sorted in PHP on
+        // sprintf('%04d%d', year, quarter) with no id tiebreak, and PHP sorts are
+        // stable — so on a tie the first-inserted row won. This pins orderByDesc(id)
+        // and the year/quarter ordering.
+        $me = $this->admin();
+        foreach ([[2026, 1], [2026, 3]] as [$year, $quarter]) {
+            $fs = FinancialStatement::create([
+                'symbol' => 'FPT', 'last_pulled_by_admin_id' => $me->id, 'year' => $year, 'quarter' => $quarter,
+            ]);
+            FinancialStatementEntry::create(['admin_id' => $me->id, 'financial_statement_id' => $fs->id]);
+            AnalysisReport::create(['financial_statement_id' => $fs->id, 'content' => json_encode([
+                $this->item('ROE', 'Khả năng sinh lời', '%', 25.0),
+            ])]);
+        }
+
+        $this->actingAs($me, 'admins')->get('/cms/compare')
+            ->assertStatus(200)->assertSee('Q3 2026')->assertDontSee('Q1 2026');
     }
 }

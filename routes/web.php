@@ -14,9 +14,7 @@
 Route::redirect('/', '/cms/admins/login');
 
 // Dashboard
-Route::get('/cms/dashboard', function () {
-    return view('cms.dashboard');
-})->name('dashboard.index')
+Route::get('/cms/dashboard', 'DashboardController@index')->name('dashboard.index')
   ->middleware('bkscms-auth:admins');
 
 // Setting routes

@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Services\Symbols;
 use App\Exceptions\Cms\Handler;
+use App\Observers\AdminSymbolObserver;
+use Bkstar123\BksCMS\AdminPanel\Admin;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -38,5 +40,10 @@ class AppServiceProvider extends ServiceProvider
             }
         }
         $this->app->singleton(SymbolsInterface::class, Symbols::class);
+
+        // Garbage-collect a deleted admin's orphaned `symbols` rows. The package's
+        // own AdminObserver (roles + profile) is registered separately by
+        // AdminPanelServiceProvider; a model may carry several observers.
+        Admin::observe(AdminSymbolObserver::class);
     }
 }

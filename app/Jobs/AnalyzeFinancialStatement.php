@@ -120,10 +120,13 @@ class AnalyzeFinancialStatement implements ShouldQueue
                 if (in_array($companyType, [1, 2, 4], true)) {
                     $institutionCalculator = new InstitutionCalculator($financialStatement);
                     $this->writeInstitution($institutionCalculator, $companyType, $financialStatement->year, $financialStatement->quarter);
-                    AnalysisReport::create([
-                        'content' => json_encode($this->content),
-                        'financial_statement_id' => $this->financialStatementID
-                    ]);
+                    // updateOrCreate: unique(financial_statement_id) now allows at
+                    // most one report per statement, and a recompute must replace it
+                    // rather than stack a second row.
+                    AnalysisReport::updateOrCreate(
+                        ['financial_statement_id' => $this->financialStatementID],
+                        ['content' => json_encode($this->content)]
+                    );
                     AnalyzeFinancialStatementCompleted::dispatch($this->user);
                     return;
                 }
@@ -264,10 +267,11 @@ class AnalyzeFinancialStatement implements ShouldQueue
             $this->writeDupontLevel2Components($dupontCalculator, $financialStatement->year, $financialStatement->quarter)
                  ->writeDupontLevel3Components($dupontCalculator, $financialStatement->year, $financialStatement->quarter)
                  ->writeDupontLevel5Components($dupontCalculator, $financialStatement->year, $financialStatement->quarter);
-            AnalysisReport::create([
-                'content' => json_encode($this->content),
-                'financial_statement_id' => $this->financialStatementID
-            ]);
+            // updateOrCreate — see the note in the institution branch above.
+            AnalysisReport::updateOrCreate(
+                ['financial_statement_id' => $this->financialStatementID],
+                ['content' => json_encode($this->content)]
+            );
             AnalyzeFinancialStatementCompleted::dispatch($this->user);
         }
     }
