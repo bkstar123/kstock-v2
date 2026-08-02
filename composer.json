@@ -66,6 +66,10 @@
         "classmap": [
             "packages/bkscms-admin-panel/src/database/seeds"
         ],
+        "exclude-from-classmap": [
+            "packages/laratune/src/database/migrations/",
+            "packages/bkscms-admin-panel/src/database/migrations/"
+        ],
         "files": [
             "app/Functions/kstock_helpers.php",
             "packages/flashing/src/Helpers/helpers.php"
